@@ -171,7 +171,6 @@ class Scale:
     def from_mask(cls, note_mask: list[int]): return Scale(np.flatnonzero(note_mask).tolist())
 
     @classmethod
-        return self.value[0]
     def from_semitones_diff(cls, st_diff: list[int]): return Scale(np.cumsum(st_diff).tolist())
 
     @cached_property
