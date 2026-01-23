@@ -8,5 +8,9 @@
     "python.analysis.typeCheckingMode": "basic",
     "python.analysis.ignore": [
         "**/mido/**"
-    ]
+    ],
+    "autopep8.args": [
+        "--max-line-length",
+        "200"
+    ],
 }
