@@ -149,31 +149,61 @@ class Cycles:
     MINOR_THIRD = Cycle(3)
     MAJOR_SECOND = Cycle(2)
     MINOR_SECOND = Cycle(1)
-    @classmethod
-    def from_midi(cls, midi1: int, midi2: int, prefer_thirds: bool = False) -> Interval:
-        semitones = abs(midi1 - midi2)
-        return cls.from_semitones(semitones, prefer_thirds=prefer_thirds)
-    
-    @classmethod
-    def from_notes(cls, note1: Note, note2: Note, prefer_thirds: bool = False) -> Interval:
-        return cls.from_midi(note1.midi, note2.midi, prefer_thirds=prefer_thirds)
-    
-    @property
-    def semitones(self) -> int:
-        return self.value[0]
-    
-    @property
-    def degree(self) -> int:
-        return self.value[1]
-    
-    @property
-    def dissonance(self) -> float:
-        return Chord([Note(0), Note(self.semitones)]).dissonance
 
-    @property
-    def similars(self) -> set[Interval]:
-        modulo_semitones = self.semitones % 12
-        return {i for i in Interval if i.semitones % 12 == modulo_semitones}
+
+@dataclass(frozen=True)
+class Scale:
+    degree_semitones: list[int]
+
+    def __post_init__(self):
+        if len(self.degree_semitones) != 7:
+            raise ValueError(f'Need 7 notes, got {len(self.degree_semitones)}')
+        for st in self.degree_semitones:
+            if not 0 <= st <= 11:
+                raise ValueError(f'Semitones must be between 0 and 11, got {self.degree_semitones}')
+
+    def __str__(self): return f"Scale({self.degree_semitones})"
+    def __repr__(self): return f"<{self.__class__.__name__}: {self.__str__()}>"
+    def __getitem__(self, deg: int): return self.degree_semitones[(deg - 1) % 7]
+    def __len__(self): return len(self.degree_semitones)
+
+    @classmethod
+    def from_mask(cls, note_mask: list[int]): return Scale(np.flatnonzero(note_mask).tolist())
+
+    @classmethod
+        return self.value[0]
+    def from_semitones_diff(cls, st_diff: list[int]): return Scale(np.cumsum(st_diff).tolist())
+
+    @cached_property
+    def semitones_diff(self) -> list[int]:
+        return np.diff(self.degree_semitones, prepend=self.degree_semitones[-1] - 12).tolist()
+
+    @cached_property
+    def mask(self) -> list[int]:
+        mask = np.zeros(12, dtype=int)
+        mask[self.degree_semitones] = 1
+        return mask.tolist()
+
+    def shift(self, start_degree: int) -> Scale:
+        new_semitones = np.roll(self.degree_semitones, start_degree % 7)
+        new_semitones = (new_semitones - new_semitones[0]) % 12
+        return Scale(new_semitones.tolist())
+
+    def transpose(self, start_pitch: int):
+        return Scale([(st + start_pitch) % 12 for st in self.degree_semitones])
+
+
+class Scales:
+    IONIAN = Scale(IONIAN_SEMITONES)
+    DORIAN = Scale(IONIAN_SEMITONES).shift(2)
+    PHRYGIAN = Scale(IONIAN_SEMITONES).shift(4)
+    LYDIAN = Scale(IONIAN_SEMITONES).shift(5)
+    MIXOLYDIAN = Scale(IONIAN_SEMITONES).shift(7)
+    AEOLIAN = Scale(IONIAN_SEMITONES).shift(9)
+    LOCRIAN = Scale(IONIAN_SEMITONES).shift(11)
+    MINOR_HARM = Scale([0, 2, 3, 5, 7, 8, 11])
+    MINOR_ASC = Scale([0, 2, 3, 5, 7, 9, 11])
+
 
 
 class ChordShape(Enum):
