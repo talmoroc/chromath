@@ -108,6 +108,47 @@ class Intervals:
     def __repr__(self): return self.__str__()
     def is_known_interval(self, iv: Interval): return iv in vars(Interval).values()
 
+
+@dataclass(frozen=True)
+class Cycle:
+    step: int
+    start_pitch: int = 0
+
+    def __post_init__(self):
+        if not 1 <= self.step <= 12:
+            raise ValueError('Step must be between 1 and 12:', self.step)
+
+    def __getitem__(self, index: int): return (self.step * index + self.start_pitch) % 12
+
+    @cached_property
+    def periodicity(self): return 12 // self.step if 12 % self.step == 0 else 12
+
+    @cached_property
+    def positions(self) -> list[None | int]:
+        """ Gives for each pitch in the cycle, its position in the cycle.
+        Negative or Positive. None if the pitch is not in the cycle. """
+        output: list[None | int] = [None] * 12
+        # self[i] nous donne le prochain élément du cycle en semitones, donc l'index.
+        # Ensuite, il s'agit de vérifier s'il est plus court de le trouver dans le côté négatif ou positif du cycle.
+        # par périodicité, self[i] = self[i - self.periodicity]
+        for i in range(self.periodicity):
+            positive_is_shortest = i <= -(i - self.periodicity)
+            output[self[i]] = i if positive_is_shortest else i - \
+                self.periodicity
+        return output
+
+    @cached_property
+    def mask(self): return [0 if pos is None else 1 for pos in self.positions]
+
+    def from_pitch(self, pitch: int): return replace(self, start_pitch=pitch)
+
+
+class Cycles:
+    FIFTH = Cycle(7)
+    MAJOR_THIRD = Cycle(4)
+    MINOR_THIRD = Cycle(3)
+    MAJOR_SECOND = Cycle(2)
+    MINOR_SECOND = Cycle(1)
     @classmethod
     def from_midi(cls, midi1: int, midi2: int, prefer_thirds: bool = False) -> Interval:
         semitones = abs(midi1 - midi2)
