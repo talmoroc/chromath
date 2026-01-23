@@ -17,8 +17,8 @@ IONIAN_SEMITONES = [0, 2, 4, 5, 7, 9, 11]
 def pitch_distance(p1: int | Pitch, p2: int | Pitch) -> int:
     """ Distance between two notes (defined by semitones)
     within the 12-tones equal temperament. Values in [0-6]"""
-    if isinstance(p1, Pitch): p1 = p1.altered_pitch
-    if isinstance(p2, Pitch): p2 = p2.altered_pitch
+    if isinstance(p1, Pitch): p1 = p1.sounding_pitch
+    if isinstance(p2, Pitch): p2 = p2.sounding_pitch
     if not 0 <= p1 <= 11 or not 0 <= p2 <= 11: raise ValueError(f'Pitches must be between 0 and 11 - got {p1}, {p2}')
     diff = abs(p2 - p1) % 12
     return diff if diff <= 6 else 12 - diff
@@ -29,14 +29,14 @@ def pitch_distance(p1: int | Pitch, p2: int | Pitch) -> int:
 @dataclass
 class Pitch:
     absolute_pitch: int
-    accidentals: int
+    accidentals: int = 0
 
     def __post_init__(self):
         if not 0 <= self.absolute_pitch <= 11:
             self.absolute_pitch = self.absolute_pitch % 12
 
     @cached_property
-    def altered_pitch(self) -> int: return (self.absolute_pitch + self.accidentals) % 12
+    def sounding_pitch(self): return (self.absolute_pitch + self.accidentals) % 12
 
     @cached_property
     def is_altered(self): return self.accidentals != 0
@@ -91,6 +91,7 @@ class Intervals:
     m6    = (8, 6)
     M6    = (9, 6)
     b7    = (9, 7)
+    aug6  = (10, 6)
     m7    = (10, 7)
     M7    = (11, 7)
     P8    = (0, 8)
