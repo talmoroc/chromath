@@ -32,9 +32,30 @@ class Pitch(Enum):
     def from_midi(cls, midi_note: int):
         return cls(midi_note % 12)
 
+# NOTE: Notes will handle octaves -> 9th, 13th etc. Extended Intervals
+# Ici : attention à la confusion. Semitones = pitch ? J'enregistre 2 semitones dans l'intervalle ou 14 ?
+# Pour moi, ... 14 sera déduit au niveau de l'interprétation de l'intervalle
+# (degré > 7 => +12 dans les semitones - ou pas selon le mode de génération de l'accord)
+@dataclass(frozen=True, order=True)
+class Interval:
+    functional_degree: int
+    pitch: int
 
-class Interval(Enum):
-    P0    = (0, 1) # semitones, degree
+    def __post_init__(self):
+        if not 1 <= self.functional_degree <= 13:
+            raise ValueError(f'Functional degree must be between 1 and 13, got {self.functional_degree}')
+        if not 0 <= self.pitch <= 11:
+            raise ValueError(f'Pitch must be between 0 and 11, got {self.pitch}')
+
+    @cached_property
+    def degree(self): return self.functional_degree % 7
+
+    @cached_property
+    def dissonance(self): return utils.dissonance([0, self.functional_degree])
+
+
+class Intervals:
+    P0    = (0, 1)
     m2    = (1, 2)
     M2    = (2, 2)
     aug2  = (3, 2)
@@ -50,27 +71,21 @@ class Interval(Enum):
     b7    = (9, 7)
     m7    = (10, 7)
     M7    = (11, 7)
-    P8    = (12, 8)
-    m9    = (13, 9)
-    M9    = (14, 9)
-    aug9  = (15, 9)
-    m10   = (15, 10)
-    M10   = (16, 10)
-    P11   = (17, 11)
-    aug11 = (18, 11)
-    m13   = (19, 13)
-    M13   = (20, 13)
-    
-    @classmethod
-    def from_semitones(cls, semitones: int, prefer_thirds: bool = False) -> Interval:
-        modulo_semitones = semitones % 12
-        matches = [i for i in cls if i.semitones == modulo_semitones]
-        if prefer_thirds:
-            for i in matches:
-                if i.degree % 2 == 1:
-                    return i
-        return matches[0]
-    
+    P8    = (0, 8)
+    m9    = (1, 9)
+    M9    = (2, 9)
+    aug9  = (3, 9)
+    m10   = (3, 10)
+    M10   = (4, 10)
+    P11   = (5, 11)
+    aug11 = (6, 11)
+    m13   = (7, 13)
+    M13   = (8, 13)
+
+    def __str__(self): return self.__class__.__name__
+    def __repr__(self): return self.__str__()
+    def is_known_interval(self, iv: Interval): return iv in vars(Interval).values()
+
     @classmethod
     def from_midi(cls, midi1: int, midi2: int, prefer_thirds: bool = False) -> Interval:
         semitones = abs(midi1 - midi2)
