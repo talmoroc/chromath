@@ -8,29 +8,45 @@ if TYPE_CHECKING:
 A4_MIDI_VALUE = 69
 A4_FREQ = 440.0
 
-class Pitch(Enum):
-    C = 0
-    CS = 1
-    D = 2
-    DS = 3
-    E = 4
-    F = 5
-    FS = 6
-    G = 7
-    GS = 8
-    A = 9
-    AS = 10
-    B = 11
-    
-    def __str__(self):
-        return self.name.replace('S', '#')
-    
-    def __repr__(self):
-        return str((self.name.replace('S', '#'), self.value))
+def pitch_distance(p1: int | Pitch, p2: int | Pitch) -> int:
+    """ Distance between two notes (defined by semitones)
+    within the 12-tones equal temperament. Values in [0-6]"""
+    if isinstance(p1, Pitch): p1 = p1.altered_pitch
+    if isinstance(p2, Pitch): p2 = p2.altered_pitch
+    if not 0 <= p1 <= 11 or not 0 <= p2 <= 11: raise ValueError(f'Pitches must be between 0 and 11 - got {p1}, {p2}')
+    diff = abs(p2 - p1) % 12
+    return diff if diff <= 6 else 12 - diff
 
-    @classmethod
-    def from_midi(cls, midi_note: int):
-        return cls(midi_note % 12)
+
+# NOTE: l'utilité de cette classe est peut-être limitée. Peut être géré au niveau de Note.
+# D'un autre côté, c'est la classe qui représente la similitude par octave des notes.
+@dataclass
+class Pitch:
+    absolute_pitch: int
+    accidentals: int
+
+    def __post_init__(self):
+        if not 0 <= self.absolute_pitch <= 11:
+            self.absolute_pitch = self.absolute_pitch % 12
+
+    @cached_property
+    def altered_pitch(self) -> int: return (self.absolute_pitch + self.accidentals) % 12
+
+    @cached_property
+    def is_altered(self): return self.accidentals != 0
+
+    def __sub__(self, other: Pitch | int):
+        if isinstance(other, Pitch):
+            return Pitch(self.absolute_pitch - other.absolute_pitch, self.accidentals - other.accidentals)
+        return Pitch((self.absolute_pitch - other) % 12, self.accidentals)
+
+    def __add__(self, other: Pitch | int):
+        if isinstance(other, Pitch):
+            return Pitch((self.absolute_pitch + other.absolute_pitch) % 12, self.accidentals + other.accidentals)
+        return Pitch((self.absolute_pitch + other) % 12, self.accidentals)
+
+    def shift(self, semitones): return Pitch(self.absolute_pitch + semitones, self.accidentals)
+    def alter(self, accidentals): return Pitch(self.absolute_pitch, self.accidentals + accidentals)
 
 # NOTE: Notes will handle octaves -> 9th, 13th etc. Extended Intervals
 # Ici : attention à la confusion. Semitones = pitch ? J'enregistre 2 semitones dans l'intervalle ou 14 ?
