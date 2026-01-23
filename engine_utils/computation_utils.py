@@ -1,16 +1,8 @@
 import math
 
-from engine_utils.music_constants import *
-
-def compute_chord_shape(intervals: list[int]) -> ChordShape:
-    chord_shape = ChordShape(intervals)
-    if chord_shape is not None:
-        return chord_shape
-    return ChordShape.UNKNOWN
-
 def midi_freq(midi_value: int) -> float:
     """Convert MIDI note number to frequency in Hz."""
-    return A4_FREQ * (2 ** (float(midi_value - A4_MIDI_VALUE) / 12))
+    return 440 * (2 ** (float(midi_value - 69) / 12))
 
 # https://arxiv.org/pdf/1306.6458#subsection.3.2
 def approximate_frequency_ratio(f1: float, f2: float, d: float = 0.01, divide_by: int = 1) -> tuple[int, int, float]:
@@ -49,7 +41,7 @@ def relative_periodicity(semitones: list[int], reference_index:int = 0, d: float
     return int(ratios[0][2] * math.lcm(*denominators))
 
 
-def smoothed_relative_periodicity(semitones: list[int], d: float = 0.011, sort: bool = True, log: bool = True, verbose: bool = False) -> float:
+def smoothed_relative_periodicity(semitones: list[int], d: float = 0.011, sort: bool = True, log: bool = True, verbose: bool = True) -> float:
     current_semitones = sorted(list(set(semitones))) if sort else list(set(semitones))
     n = len(current_semitones)
     relative_periodicities: list[int] = []
@@ -70,6 +62,9 @@ def midi_interval_ratio(midi1: int, midi2: int, d: float = 0.011) -> tuple[int, 
     f1 = midi_freq(midi1)
     f2 = midi_freq(midi2)
     return approximate_frequency_ratio(f1, f2, d)
+
+def dissonance(semitones: list[int]):
+    return smoothed_relative_periodicity(semitones, verbose = False)
 
 # def find_chord_roots_from_intervals(intervals: list[int]) -> list[tuple[utils.Note, float]]:
 
