@@ -1,9 +1,13 @@
 from __future__ import annotations
+from functools import cached_property
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from music_objects import Note, Chord
+    from music_objects import Note
+
+import engine_utils.computation_utils as utils
+import numpy as np
 
 A4_MIDI_VALUE = 69
 A4_FREQ = 440.0
