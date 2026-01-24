@@ -4,8 +4,12 @@
     "python-envs.pythonProjects": [],
     "python.analysis.diagnosticSeverityOverrides": {
         "reportUnusedVariable": "information",
+        "reportUnusedImport": "information",
+        "reportUnusedFunction": "information"
     },
-    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.typeCheckingMode": "strict",
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.indexing": true,
     "python.analysis.ignore": [
         "**/mido/**"
     ],
