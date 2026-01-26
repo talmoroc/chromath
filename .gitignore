@@ -1,5 +1,6 @@
 .conda/*
 samples/*
+dev_notes/.obsidian/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
