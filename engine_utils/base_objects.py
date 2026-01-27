@@ -213,7 +213,7 @@ class Cycles:
 class Scale:
     degree_semitones: list[int]
     _tones: int = MS.tones
-    _degrees: int = DEGREES
+    _degrees: int = MS.degrees
 
     def __post_init__(self):
         if len(self.degree_semitones) != self._degrees:
@@ -320,7 +320,7 @@ class Interval:
     functional_degree: int
     pitch: int
     _tones: int = MS.tones
-    _degrees: int = DEGREES
+    _degrees: int = MS.degrees
     _functional_degrees: int = FUNCTIONAL_DEGREES
     _standard_intervals: ClassVar[dict[tuple[int, int], str]] = {}
     _registered: ClassVar[bool] = False
