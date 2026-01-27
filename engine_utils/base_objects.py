@@ -321,7 +321,7 @@ class Interval:
     pitch: int
     _tones: int = MS.tones
     _degrees: int = MS.degrees
-    _functional_degrees: int = FUNCTIONAL_DEGREES
+    _functional_degrees: int = MS.func_degrees
     _standard_intervals: ClassVar[dict[tuple[int, int], str]] = {}
     _registered: ClassVar[bool] = False
 
