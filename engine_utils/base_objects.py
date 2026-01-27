@@ -1,6 +1,5 @@
 from __future__ import annotations
 from music_system import MusicSystem, get_current_music_system, use_system
-from music_constants import *
 import dissonance_computation as utils
 from dataclasses import dataclass, replace, field
 from functools import cached_property
