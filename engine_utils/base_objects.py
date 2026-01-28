@@ -33,21 +33,19 @@ class Tone:
 class Chroma:
     __slots__ = ('_mask', '_semitones', '_as_int')
 
+    def _new(self, data) -> Self:  # Allows to inherit methods without redefining output. Useful for Scales
+        return self.__class__(data)
+
     def __init__(self, data: ArrayLike):
-        arr: NDArrayInt8 = np.array(data, dtype=DTYPE, copy=True).ravel()  # Conversion
+        arr: NDArrayInt8 = np.array(data, DTYPE, copy=True).ravel()  # Conversion
         arr.flags.writeable = False  # Immutability
         if arr.shape != (MS.tones,):  # Check shape
             raise ValueError(f"Chroma must be length {MS.tones}, got {arr.shape}")
+        if not set(arr) <= {0, 1}:
+            raise ValueError(f"Chroma values must be 0 or 1, got {arr}")
         self._mask: NDArrayInt8 = arr
         self._semitones: NDArrayInt8 = np.flatnonzero(arr).astype(DTYPE)
         self._as_int: int = int(np.dot(arr, MS.powers))
-
-    def __len__(self) -> int: return MS.tones
-    def __int__(self) -> int: return self._as_int
-    def __str__(self) -> str: return f"{self._mask}"
-    def __repr__(self) -> str: return f"<Chroma({self._mask}), {self._as_int}>"
-    def __hash__(self) -> int: return hash(self._as_int)
-    def __iter__(self): return iter(self._mask)
 
     @classmethod
     def from_semitones(cls, semitones: ArrayLike, rolling_indices: bool = True) -> Chroma:
@@ -58,16 +56,38 @@ class Chroma:
             match rolling_indices:
                 case True: semitones %= MS.tones  # correction if rolling_indices
                 case False: raise ValueError(f'Semitones must be between 0 and {MS.tones}, got {semitones}')
-        _temp_mask = np.zeros(MS.tones)
+        _temp_mask = np.zeros(MS.tones, dtype=DTYPE)
         _temp_mask[semitones] = 1
-        return Chroma(_temp_mask)
+        return cls(_temp_mask)
 
     @classmethod
     def from_bits(cls, bitwise_repr: int) -> Chroma:
         if bitwise_repr >= MS.max_int_repr:
             raise ValueError(f'Bitwise representation must be less than 2**{MS.tones} = {MS.max_int_repr}, got {bitwise_repr}')
-        _temp_mask = np.array([(bitwise_repr >> i) & 1 for i in range(MS.tones)], dtype=np.int8)
-        return Chroma(_temp_mask)
+        _temp_mask = np.array(((bitwise_repr >> i) & 1 for i in range(MS.tones)), dtype=DTYPE)
+        return cls(_temp_mask)
+
+    def __len__(self) -> int: return MS.tones
+    def __int__(self) -> int: return self._as_int
+    def __str__(self) -> str: return f"{self._mask}"
+    def __repr__(self) -> str: return f"<Chroma({self._mask}), {self._as_int}>"
+    def __hash__(self) -> int: return hash(self._as_int)
+    def __iter__(self) -> Iterable: return iter(self._mask)
+    def __in__(self, key: int) -> bool: return self.binary_vector[key] == 1
+    def __add__(self, other: Self) -> Self: return self._new(self._mask | other._mask)
+    def __mul__(self, other: Self) -> Self: return self._new(self._mask & other._mask)
+    def __sub__(self, other: Self) -> Self: return self._new(self._mask & ~other._mask)
+    def __invert__(self) -> Self: return self._new(1 - self._mask)
+    def __matmul__(self, n: int) -> Self: return self.rotate(n)
+    def __rmatmul__(self, n: int) -> Self: return self.rotate(n)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Chroma):
+            return self._as_int == other._as_int
+        try:
+            return self._as_int == self._new(other)._as_int
+        except:
+            return NotImplemented
 
     @overload
     def __getitem__(self, index: int) -> int: ...
@@ -83,77 +103,22 @@ class Chroma:
         indices = np.arange(start, stop, step) % MS.tones
         return self._mask[indices]
 
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, Chroma):
-            return self._as_int == other._as_int
-        try:
-            return self._as_int == Chroma(other)._as_int  # type: ignore
-        except:
-            return NotImplemented
+    @cached_property
+    def binary_vector(self) -> NDArrayInt8: return self._mask
 
-    def __add__(self, other: Chroma) -> Chroma:
-        return Chroma(self._mask | other._mask)
+    @cached_property
+    def semitones_vector(self) -> NDArrayInt8:
+        return np.array([np.arange(np.sum(self._mask)), self._semitones], dtype=DTYPE)
 
-    def __mul__(self, other: Chroma) -> Chroma:
-        return Chroma(self._mask & other._mask)
+    def rotate(self, n: int) -> Self:
+        return self._new(self[n: n + MS.tones])
 
-    def __sub__(self, other: Chroma) -> Chroma:
-        return Chroma(self._mask & ~other._mask)
-
-    def __invert__(self) -> Chroma:
-        return Chroma(1 - self._mask)
-
-    def __matmul__(self, n: int) -> Chroma:
-        return self.rotate(n)
-
-    def __rmatmul__(self, n: int) -> Chroma:
-        return self.rotate(n)
-
-    @property
-    def chroma(self) -> np.ndarray: return self._mask
-
-    @property
-    def semitones(self): return self._semitones
-
-    def rotate(self, n: int) -> Chroma:
-        return Chroma(self[n: n + MS.tones])
-
-    def invert_axis(self, axis: int = 0) -> Chroma:
-        """Musical inversion around an axis (default 0)"""
-        new_mask = np.zeros(MS.tones)
-        indices = (axis - self._semitones) % 12
+    def invert(self, pivot: int = 0) -> Self:
+        """Musical inversion around a pivot (default 0)"""
+        new_mask = np.zeros(MS.tones, dtype=DTYPE)
+        indices = (pivot - self._semitones) % MS.tones
         new_mask[indices] = 1
-        return Chroma(new_mask)
-
-
-class ChromaTone(Chroma):
-    def __init__(self, semitones: int):
-        chroma = np.zeros(12, dtype=int)
-        chroma[7] = 1
-        Chroma(tuple(chroma))
-        chroma = tuple([0 if _ != 7 else 1 for _ in range(12)])
-
-        super().__init__([0 if _ != 7 else 1 for _ in range(12)])
-
-
-# Les questions qu'on peut avoir sur les cycles
-# Quel est le prochain élément ? => i.e. un unitary vector ou un pitch ? => Chroma ou semitones
-# Quels sont les n prochains éléments ? => i.e. leur chroma ou leur semitones
-    # Sachant qu'un chroma donne les semitones, mais pas dans l'ordre qu'on voudrait
-
-# Est-ce qu'un pitch est dans le cycle ?
-
-# Quelle est la distance entre ce pitch et ce pitch à travers ce cycle ?
-# Quelles sont toutes les notes qui appartiennent à ce cycle ? => Chroma ou semitones
-
-# 2 représentations possibles d'un cycle :
-    # Indice = pitch, valeur = position dans le cycle
-    # [0, None, None, 1, None, None, 2, None, None, -1, None, None]
-
-    # Indice = position dans le cycle, valeur = pitch
-    # [0, 3, 6, 9]
-
-# Plusieurs manières d'y accéder
+        return self._new(new_mask)
 
 
 @dataclass(frozen=True)
