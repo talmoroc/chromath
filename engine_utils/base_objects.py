@@ -1,27 +1,33 @@
 from __future__ import annotations
-from music_system import MusicSystem, get_current_music_system, use_system
+from collections.abc import Sequence
+from typing import Iterable
 import dissonance_computation as utils
+from music_system import MusicSystem, get_current_music_system, use_system
+import math
 from dataclasses import dataclass, replace, field
 from functools import cached_property
 import warnings
 
-from typing import ClassVar, Optional, overload, Protocol, TypeVar, Any, Literal
-
-import numpy as np
+from typing import ClassVar, Optional, overload, Protocol, TypeVar, Any, Literal, Self, override
 from numpy.typing import NDArray, DTypeLike, ArrayLike
+import numpy as np
 DTYPE = np.int8
 NDArrayInt8 = NDArray[np.int8]
+
 
 MS: MusicSystem = get_current_music_system()
 IONIAN_SEMITONES: list[int] = [0, 2, 4, 5, 7, 9, 11]
 
 
-T = TypeVar("T", covariant=True)
+class Tone:
+    def rotate(t: int, n: int) -> int:
+        return (t + n) % 12
 
+    def to_chroma(t: int) -> Chroma:
+        return Chroma.from_semitones([t])
 
-class SequenceLike(Protocol[T]):
-    def __len__(self) -> int: ...
-    def __getitem__(self, item: int) -> T: ...
+    def is_in(t: int, music_object: Cycle | Scale | Chord | Tonality) -> bool:
+        return music_object.chroma[t % 12] == 1
 
 
 class Chroma:
