@@ -309,16 +309,13 @@ class Pitch:
 class Interval:
     functional_degree: int
     pitch: int
-    _tones: int = MS.tones
-    _degrees: int = MS.degrees
-    _functional_degrees: int = MS.func_degrees
     _standard_intervals: ClassVar[dict[tuple[int, int], str]] = {}
     _registered: ClassVar[bool] = False
 
     def __post_init__(self):
-        if not 1 <= self.functional_degree < self._functional_degrees:
+        if not 1 <= self.functional_degree <= MS.func_degrees:
             raise ValueError(f'Degree {self.functional_degree} out of bounds')
-        if not 0 <= self.pitch < self._tones:
+        if not 0 <= self.pitch < MS.tones:
             raise ValueError(f'Pitch {self.pitch} out of bounds')
         if self._registered and self.name is None:
             warnings.warn(f'\033[33m' + 'Non-standard interval: ({self.functional_degree, self.pitch})' + '\033[0m')
@@ -374,7 +371,7 @@ class Interval:
     M13:   ClassVar['Interval'] = (13, 9)  # type: ignore
 
     @cached_property
-    def degree(self): return self.functional_degree % self._degrees
+    def degree(self): return self.functional_degree % MS.degrees
 
     @cached_property
     def dissonance(self): return utils.dissonance([0, self.pitch])
@@ -514,30 +511,3 @@ __all__ = ['Pitch', 'Interval', 'Cycle', 'Scale', 'Scales', 'Tonality']
 
 # def chord_is_in_scale(self):
 #     pass
-
-
-P = tuple(i for i in range(150))
-cardP = len(P)
-
-
-def cycle(n: int, s: int, c0: int = 0, cardP: int = len(P)) -> int:
-    c0 = c0 % cardP
-    s = s % cardP
-    return (c0 + s * n) % cardP
-
-
-def image(s: int) -> set[int]:
-    return set(cycle(p, s=s) for p in P)
-
-
-for s in P[2:len(P)]:
-    print('s:', s)
-    s = min(s, cardP-s)
-    step_remainder = cardP % s
-    if step_remainder == 0:
-        print(f'Partial cycle of step {s} and periodicity {cardP/s}')
-    elif s % step_remainder == 0:
-        print(f'Partial cycle of step {step_remainder} and periodicity {cardP/step_remainder}')
-    else:
-        print('Complete Cycle: Step & Remainder are co-prime')
-    print(image(s))
