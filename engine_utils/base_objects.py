@@ -161,13 +161,6 @@ class Cycle:
         if self.is_complete:
             return Chroma([1] * MS.tones)
         else:
-
-class Cycles:
-    FIFTH = Cycle(7)
-    MAJOR_THIRD = Cycle(4)
-    MINOR_THIRD = Cycle(3)
-    MAJOR_SECOND = Cycle(2)
-    MINOR_SECOND = Cycle(1)
             return Chroma(np.ndarray.astype( 1 - self.rank_matrix.mask[0], DTYPE))  # ty:ignore[unresolved-attribute]
     @cached_property
     def rank_matrix(self) -> NDArray:
@@ -196,6 +189,14 @@ class Cycles:
             ascending_rank = np.argsort(self.rank_matrix[2, :])
             descending_rank = np.argsort(-self.rank_matrix[3, :])
         return np.array([ascending_rank, descending_rank], dtype=DTYPE)
+
+
+class Cycles:
+    FIFTH = Cycle(7)
+    MAJOR_THIRD = Cycle(4)
+    MINOR_THIRD = Cycle(3)
+    MAJOR_SECOND = Cycle(2)
+    MINOR_SECOND = Cycle(1)
 
 
 @dataclass(frozen=True)
