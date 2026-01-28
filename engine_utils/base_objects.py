@@ -124,53 +124,43 @@ class Chroma:
 @dataclass(frozen=True)
 class Cycle:
     step: int
-    start_pitch: int = 0
-    _tones: int = field(init=False, default=MS.tones)
 
     def __post_init__(self):
-        if not 1 <= self.step < self._tones:
-            raise ValueError(f'Step must be between 1 and {self._tones}: got {self.step}')
+        if not 1 <= self.step < MS.tones:
+            raise ValueError(f'Step must be between 1 and {MS.tones}: got {self.step}')
 
-    def __getitem__(self, index: int): return (self.step * index + self.start_pitch) % self._tones
+    def __in__(self, key: int) -> bool: return self.chroma[key] == 1
+
+    @overload
+    def __getitem__(self, index: int) -> int: ...
+    @overload
+    def __getitem__(self, index: slice) -> NDArrayInt8: ...
+
+    def __getitem__(self, index: int | slice) -> int | NDArrayInt8:  # order -> semitone
+        if isinstance(index, int):
+            return (self.step * index) % MS.tones
+        start = 0 if index.start is None else index.start
+        dividend = start // MS.tones
+        start -= MS.tones * dividend
+        stop = start + MS.tones if index.stop is None else index.stop - MS.tones * dividend
+        step = 1 if index.step is None else index.step % MS.tones
+        slice_size = (stop - start) // MS.tones + 1
+        if not self.is_complete:
+            return np.array([self[i] for i in range(start, stop, step)], dtype=DTYPE)
+        indices = np.arange(start, stop, step) * self.step % MS.tones
+        return self.rank_matrix.view()[0, indices]
 
     @cached_property
-    def periodicity(self) -> int:
-        sym_step = min(self.step, self._tones - self.step)  # symmetrical step
-        step_remainder = self._tones % sym_step
-        if step_remainder == 0:
-            return self._tones // sym_step
-        else:
-            step_remainder_divibility = sym_step % step_remainder
-            if step_remainder_divibility == 0:
-                return self._tones // step_remainder
-        return self._tones
+    def periodicity(self): return MS.tones // math.gcd(self.step, MS.tones)
 
     @cached_property
-    def is_complete(self) -> bool: return self.periodicity == self._tones
-
-    @cached_property
-    def positions(self) -> list[Optional[int]]:
-        """ Gives for each pitch in the cycle, its position in the cycle.
-        Negative or Positive. None if the pitch is not in the cycle. """
-        output: list[Optional[int]] = [None] * self._tones
-        # self[i] nous donne le prochain élément du cycle en semitones, donc l'index.
-        # Ensuite, il s'agit de vérifier s'il est plus court de le trouver dans le côté négatif ou positif du cycle.
-        # par périodicité, self[i] = self[i - self.periodicity]
-        for i in range(self.periodicity):
-            positive_is_shortest = i <= -(i - self.periodicity)
-            output[self[i]] = i if positive_is_shortest else i - self.periodicity
-        return output
+    def is_complete(self): return self.periodicity == MS.tones
 
     @cached_property
     def chroma(self) -> Chroma:
-        return Chroma([pos or 0 for pos in self.positions])
-
-    def rotate(self, pitch: int, inplace: bool = False) -> Cycle | None:
-        if not inplace:
-            return Cycle(self.step, pitch)
+        if self.is_complete:
+            return Chroma([1] * MS.tones)
         else:
-            replace(self, pitch=pitch)
-
 
 class Cycles:
     FIFTH = Cycle(7)
@@ -178,6 +168,34 @@ class Cycles:
     MINOR_THIRD = Cycle(3)
     MAJOR_SECOND = Cycle(2)
     MINOR_SECOND = Cycle(1)
+            return Chroma(np.ndarray.astype( 1 - self.rank_matrix.mask[0], DTYPE))  # ty:ignore[unresolved-attribute]
+    @cached_property
+    def rank_matrix(self) -> NDArray:
+        idx = np.arange(MS.tones)
+        cycle_semitones = np.arange(0, self.step * self.periodicity, self.step) % MS.tones
+        mask = np.zeros(MS.tones, dtype=DTYPE)
+        cycle_asc = np.zeros(MS.tones, dtype=DTYPE)
+        mask[cycle_semitones] = 1
+        cycle_asc[cycle_semitones] = np.arange(self.periodicity)
+        cycle_desc = (self.periodicity - cycle_asc) % self.periodicity
+        cycle = np.where(cycle_asc <= cycle_desc, cycle_asc, -cycle_desc)
+        if not self.is_complete:
+            return np.ma.array([idx, cycle, cycle_asc, -cycle_desc], mask=np.tile((1 - mask), (4, 1)), dtype=DTYPE)
+        return np.array([idx, cycle, cycle_asc, -cycle_desc, mask], dtype=DTYPE)
+
+    @cached_property # Access : pitch_to_rank[1|2, pitch] 1 = ascending, 2 = descending
+    def pitch_to_rank(self) -> NDArrayInt8:
+        return self.rank_matrix.view()[2:4,]
+
+    @cached_property # Access : rank_to_pitch[1|2, rank] 1 = ascending, 2 = descending
+    def rank_to_pitch(self) -> NDArrayInt8: 
+        if not self.is_complete: # We repeat the matrix to get a MS.tones dimension
+            ascending_rank = [self[i] for i in range(MS.tones)]
+            descending_rank = [self[-i] for i in range(MS.tones)]
+        else:
+            ascending_rank = np.argsort(self.rank_matrix[2, :])
+            descending_rank = np.argsort(-self.rank_matrix[3, :])
+        return np.array([ascending_rank, descending_rank], dtype=DTYPE)
 
 
 @dataclass(frozen=True)
