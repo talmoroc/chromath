@@ -24,5 +24,4 @@
     "python.REPL.enableREPLSmartSend": false,
     "ty.inlayHints.variableTypes": false,
     "ty.inlayHints.callArgumentNames": false,
-    "ty.diagnosticMode": "workspace"
 }
