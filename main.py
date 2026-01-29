@@ -1,6 +1,6 @@
 import mido
 
-from engine_utils.computation_utils import *
+from engine_utils.dissonance_computation import *
 from music_objects import *
 
 
@@ -16,7 +16,7 @@ def __main__():
     port_name = find_port_name()
     outport = mido.open_output(port_name)  # type: ignore
 
-    A4 = Note(A4_MIDI_VALUE)
+    A4 = Note(69)
     c = Chord.from_shape(A4, ChordShape.m7)
     print(c)
     c2 = c.invert(1)
