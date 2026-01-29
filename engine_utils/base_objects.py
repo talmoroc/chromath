@@ -167,7 +167,7 @@ class Cycle:
         else:
             return Chroma(np.ndarray.astype( 1 - self.rank_matrix.mask[0], DTYPE))  # ty:ignore[unresolved-attribute]
     @cached_property
-    def rank_matrix(self) -> NDArray:
+    def rank_matrix(self) -> NDArrayInt8:
         idx = np.arange(MS.tones)
         cycle_semitones = np.arange(0, self.step * self.periodicity, self.step) % MS.tones
         mask = np.zeros(MS.tones, dtype=DTYPE)
@@ -176,9 +176,7 @@ class Cycle:
         cycle_asc[cycle_semitones] = np.arange(self.periodicity)
         cycle_desc = (self.periodicity - cycle_asc) % self.periodicity
         cycle = np.where(cycle_asc <= cycle_desc, cycle_asc, -cycle_desc)
-        if not self.is_complete:
-            return np.ma.array([idx, cycle, cycle_asc, -cycle_desc], mask=np.tile((1 - mask), (4, 1)), dtype=DTYPE)
-        return np.array([idx, cycle, cycle_asc, -cycle_desc, mask], dtype=DTYPE)
+        return np.ma.array([idx, cycle, cycle_asc, -cycle_desc], mask=np.tile((1 - mask), (4, 1)), dtype=DTYPE)
 
     @cached_property # Access : pitch_to_rank[1|2, pitch] 1 = ascending, 2 = descending
     def pitch_to_rank(self) -> NDArrayInt8:
