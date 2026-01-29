@@ -232,6 +232,10 @@ class Scale:
         mask = np.zeros(MS.tones, dtype=int)
         mask[self.degree_semitones] = 1
         return mask.tolist()
+    
+    @cached_property
+    def chroma(self) -> Chroma:
+        return Chroma(self.mask)
 
     def shift(self, start_degree: int) -> Scale:
         new_semitones = np.roll(self.degree_semitones, start_degree % MS.degrees)
@@ -388,9 +392,11 @@ Interval._register_standard_intervals()  # pyright: ignore[reportPrivateUsage]
 # Ils ont simplement des méthodes différentes.
 
 
-class ReducedChord:
+class Chord:
     def __init__(self, intervals: list[Interval]):
-        pass
+        self.chroma = Chroma([0] * 12)
+    
+    
 
 
 # Le risque de distinguer au sein même de l'objet Chord de quels intervalles il est constitué,
@@ -412,6 +418,7 @@ class Tonality:
             raise ValueError(f'Tonality root must be a pitch between 0 and 11, got {root}')
         self.root = root  # Flatten accidentals for the root of a tonality
         self.scale = scale.transpose(self.root)  # Apply the scale to the root
+        self.chroma = self.scale.chroma
 
 # METHODS OR EXTERNAL FUNCTIONS OR EXTERNAL OBJECTS : TO BE DETERMINED
     # EXTERNAL: Provide the midi notes of the tonality
