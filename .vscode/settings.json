@@ -1,20 +1,7 @@
 {
-    "explorer.autoReveal":false,
     "python-envs.defaultEnvManager": "ms-python.python:conda",
     "python-envs.defaultPackageManager": "ms-python.python:conda",
     "python-envs.pythonProjects": [],
-    "python.analysis.diagnosticSeverityOverrides": {
-        "reportUnusedVariable": "information",
-        "reportUnusedFunction": "information"
-    },
-    "python.terminal.launchArgs": [
-        "-m",
-        "IPython",
-        "--no-autoindent",
-    ],
-    "python.analysis.typeCheckingMode": "strict",
-    "python.analysis.autoImportCompletions": true,
-    "python.analysis.indexing": true,
     "python.analysis.ignore": [
         "**/mido/**"
     ],
@@ -22,7 +9,4 @@
         "--max-line-length",
         "200"
     ],
-    "python.REPL.enableREPLSmartSend": false,
-    "ty.inlayHints.variableTypes": false,
-    "ty.inlayHints.callArgumentNames": false,
 }
