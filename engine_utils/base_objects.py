@@ -360,7 +360,8 @@ class Interval:
     aug5:  ClassVar['Interval'] = (5, 8)  # type: ignore
     m6:    ClassVar['Interval'] = (6, 8)  # type: ignore
     M6:    ClassVar['Interval'] = (6, 9)  # type: ignore
-    dim7:  ClassVar['Interval'] = (7, 9)  # type: ignore
+    aug6:    ClassVar['Interval'] = (6, 10)  # type: ignore
+    b7:  ClassVar['Interval'] = (7, 9)  # type: ignore
     m7:    ClassVar['Interval'] = (7, 10)  # type: ignore
     M7:    ClassVar['Interval'] = (7, 11)  # type: ignore
     P8:    ClassVar['Interval'] = (8, 0)  # type: ignore

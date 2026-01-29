@@ -13,105 +13,105 @@ class DegreeChordsFromScale:
 
 class ChordShape(Enum):
     # Triads (most common)
-    M = {Intervals.P0, Intervals.M3, Intervals.P5}      # Major
-    m = {Intervals.P0, Intervals.m3, Intervals.P5}      # Minor
-    aug = {Intervals.P0, Intervals.M3, Intervals.aug5}  # Augmented
-    dim = {Intervals.P0, Intervals.m3, Intervals.b5}    # Diminished
+    M = {Interval.P0, Interval.M3, Interval.P5}      # Major
+    m = {Interval.P0, Interval.m3, Interval.P5}      # Minor
+    aug = {Interval.P0, Interval.M3, Interval.aug5}  # Augmented
+    dim = {Interval.P0, Interval.m3, Interval.b5}    # Diminished
 
     # Seventh chords (very common)
-    M7 = {Intervals.P0, Intervals.M3,
-          Intervals.P5, Intervals.M7}      # Major 7
-    m7 = {Intervals.P0, Intervals.m3,
-          Intervals.P5, Intervals.m7}      # Minor 7
-    dom7 = {Intervals.P0, Intervals.M3,
-            Intervals.P5, Intervals.m7}    # Dominant 7
-    mM7 = {Intervals.P0, Intervals.m3, Intervals.P5,
-           Intervals.M7}     # Minor Major 7
-    aug7 = {Intervals.P0, Intervals.M3,
-            Intervals.aug5, Intervals.m7}  # Augmented 7
-    dim7 = {Intervals.P0, Intervals.m3, Intervals.b5,
-            Intervals.b7}    # Diminished 7
-    halfdim7 = {Intervals.P0, Intervals.m3,
-                Intervals.b5, Intervals.m7}  # Half-diminished 7
+    M7 = {Interval.P0, Interval.M3,
+          Interval.P5, Interval.M7}      # Major 7
+    m7 = {Interval.P0, Interval.m3,
+          Interval.P5, Interval.m7}      # Minor 7
+    dom7 = {Interval.P0, Interval.M3,
+            Interval.P5, Interval.m7}    # Dominant 7
+    mM7 = {Interval.P0, Interval.m3, Interval.P5,
+           Interval.M7}     # Minor Major 7
+    aug7 = {Interval.P0, Interval.M3,
+            Interval.aug5, Interval.m7}  # Augmented 7
+    dim7 = {Interval.P0, Interval.m3, Interval.b5,
+            Interval.b7}    # Diminished 7
+    halfdim7 = {Interval.P0, Interval.m3,
+                Interval.b5, Interval.m7}  # Half-diminished 7
 
     # Sixth chords (common)
-    M6 = {Intervals.P0, Intervals.M3,
-          Intervals.P5, Intervals.M6}      # Major 6
-    m6 = {Intervals.P0, Intervals.m3,
-          Intervals.P5, Intervals.M6}      # Minor 6
-    Mb6 = {Intervals.P0, Intervals.M3, Intervals.P5,
-           Intervals.m6}      # Major with minor 6
-    mb6 = {Intervals.P0, Intervals.m3, Intervals.P5,
-           Intervals.m6}      # Minor with minor 6
+    M6 = {Interval.P0, Interval.M3,
+          Interval.P5, Interval.M6}      # Major 6
+    m6 = {Interval.P0, Interval.m3,
+          Interval.P5, Interval.M6}      # Minor 6
+    Mb6 = {Interval.P0, Interval.M3, Interval.P5,
+           Interval.m6}      # Major with minor 6
+    mb6 = {Interval.P0, Interval.m3, Interval.P5,
+           Interval.m6}      # Minor with minor 6
 
     # Suspended chords (common)
-    sus2 = {Intervals.P0, Intervals.M2,
-            Intervals.P5}     # Suspended 2
-    sus4 = {Intervals.P0, Intervals.P4,
-            Intervals.P5}     # Suspended 4
-    sus47 = {Intervals.P0, Intervals.P4, Intervals.P5,
-             Intervals.m7}  # Suspended 4 with 7
+    sus2 = {Interval.P0, Interval.M2,
+            Interval.P5}     # Suspended 2
+    sus4 = {Interval.P0, Interval.P4,
+            Interval.P5}     # Suspended 4
+    sus47 = {Interval.P0, Interval.P4, Interval.P5,
+             Interval.m7}  # Suspended 4 with 7
 
     # Add9 and extended chords
-    add9 = {Intervals.P0, Intervals.M3,
-            Intervals.P5, Intervals.M9}    # Major add 9
-    madd9 = {Intervals.P0, Intervals.m3,
-             Intervals.P5, Intervals.M9}   # Minor add 9
-    M9 = {Intervals.P0, Intervals.M3, Intervals.P5,
-          Intervals.M7, Intervals.M9}     # Major 9
-    m9 = {Intervals.P0, Intervals.m3, Intervals.P5,
-          Intervals.m7, Intervals.M9}     # Minor 9
-    dom9 = {Intervals.P0, Intervals.M3, Intervals.P5,
-            Intervals.m7, Intervals.M9}   # Dominant 9
+    add9 = {Interval.P0, Interval.M3,
+            Interval.P5, Interval.M9}    # Major add 9
+    madd9 = {Interval.P0, Interval.m3,
+             Interval.P5, Interval.M9}   # Minor add 9
+    M9 = {Interval.P0, Interval.M3, Interval.P5,
+          Interval.M7, Interval.M9}     # Major 9
+    m9 = {Interval.P0, Interval.m3, Interval.P5,
+          Interval.m7, Interval.M9}     # Minor 9
+    dom9 = {Interval.P0, Interval.M3, Interval.P5,
+            Interval.m7, Interval.M9}   # Dominant 9
 
     # 11th chords
-    M11 = {Intervals.P0, Intervals.M3, Intervals.P5,
-           Intervals.M7, Intervals.M9, Intervals.P11}    # Major 11
-    m11 = {Intervals.P0, Intervals.m3, Intervals.P5,
-           Intervals.m7, Intervals.M9, Intervals.P11}    # Minor 11
-    dom11 = {Intervals.P0, Intervals.M3, Intervals.P5,
-             Intervals.m7, Intervals.M9, Intervals.P11}  # Dominant 11
+    M11 = {Interval.P0, Interval.M3, Interval.P5,
+           Interval.M7, Interval.M9, Interval.P11}    # Major 11
+    m11 = {Interval.P0, Interval.m3, Interval.P5,
+           Interval.m7, Interval.M9, Interval.P11}    # Minor 11
+    dom11 = {Interval.P0, Interval.M3, Interval.P5,
+             Interval.m7, Interval.M9, Interval.P11}  # Dominant 11
 
     # 13th chords
-    M13 = {Intervals.P0, Intervals.M3, Intervals.P5,
-           Intervals.M7, Intervals.M9, Intervals.M13}    # Major 13
-    m13 = {Intervals.P0, Intervals.m3, Intervals.P5,
-           Intervals.m7, Intervals.M9, Intervals.m13}    # Minor 13
-    dom13 = {Intervals.P0, Intervals.M3, Intervals.P5,
-             Intervals.m7, Intervals.M9, Intervals.M13}  # Dominant 13
+    M13 = {Interval.P0, Interval.M3, Interval.P5,
+           Interval.M7, Interval.M9, Interval.M13}    # Major 13
+    m13 = {Interval.P0, Interval.m3, Interval.P5,
+           Interval.m7, Interval.M9, Interval.m13}    # Minor 13
+    dom13 = {Interval.P0, Interval.M3, Interval.P5,
+             Interval.m7, Interval.M9, Interval.M13}  # Dominant 13
 
     # Power chords (common in rock)
-    P5 = {Intervals.P0, Intervals.P5}  # Power chord (no third)
+    P5 = {Interval.P0, Interval.P5}  # Power chord (no third)
 
     # Flat 5 / sharp 5 variations
-    augM7 = {Intervals.P0, Intervals.M3, Intervals.aug5,
-             Intervals.M7}  # Augmented Major 7
-    dimM7 = {Intervals.P0, Intervals.m3, Intervals.b5,
-             Intervals.M7}    # Diminished Major 7
+    augM7 = {Interval.P0, Interval.M3, Interval.aug5,
+             Interval.M7}  # Augmented Major 7
+    dimM7 = {Interval.P0, Interval.m3, Interval.b5,
+             Interval.M7}    # Diminished Major 7
 
     # Omitted chord variations
-    M_no5 = {Intervals.P0, Intervals.M3}            # Major with no 5
-    m_no5 = {Intervals.P0, Intervals.m3}            # Minor with no 5
+    M_no5 = {Interval.P0, Interval.M3}            # Major with no 5
+    m_no5 = {Interval.P0, Interval.m3}            # Minor with no 5
 
-    aug6 = {Intervals.P0, Intervals.M3, Intervals.P5, Intervals.aug6}
+    aug6 = {Interval.P0, Interval.M3, Interval.P5, Interval.aug6}
 
     # Jazz and advanced
-    aug9 = {Intervals.P0, Intervals.M3,
-            Intervals.aug5, Intervals.M9}   # Augmented 9
-    M7sharp11 = {Intervals.P0, Intervals.M3, Intervals.P5,
-                 Intervals.M7, Intervals.aug11}  # Lydian
+    aug9 = {Interval.P0, Interval.M3,
+            Interval.aug5, Interval.M9}   # Augmented 9
+    M7sharp11 = {Interval.P0, Interval.M3, Interval.P5,
+                 Interval.M7, Interval.aug11}  # Lydian
     # Half-diminished (alternate spelling)
-    m7b5 = {Intervals.P0, Intervals.m3, Intervals.b5, Intervals.m7}
+    m7b5 = {Interval.P0, Interval.m3, Interval.b5, Interval.m7}
 
     # Cluster / polychords (less common, added tones)
-    M7add13 = {Intervals.P0, Intervals.M3,
-               Intervals.P5, Intervals.M7, Intervals.M13}
-    m7add13 = {Intervals.P0, Intervals.m3,
-               Intervals.P5, Intervals.m7, Intervals.m13}
+    M7add13 = {Interval.P0, Interval.M3,
+               Interval.P5, Interval.M7, Interval.M13}
+    m7add13 = {Interval.P0, Interval.m3,
+               Interval.P5, Interval.m7, Interval.m13}
 
     # Extended suspensions
-    sus2sus4 = {Intervals.P0, Intervals.M2,
-                Intervals.P4, Intervals.P5}  # Sus2 Sus4
+    sus2sus4 = {Interval.P0, Interval.M2,
+                Interval.P4, Interval.P5}  # Sus2 Sus4
 
     # Empty/Unknown
     UNKNOWN = set()
@@ -132,7 +132,7 @@ class ChordShape(Enum):
 
     #     sorted_midi = sorted([n.midi for n in notes])
     #     root_midi = sorted_midi[0]
-    #     intervals = [Intervals.from_semitones(
+    #     intervals = [Interval.from_semitones(
     #         m - root_midi) for m in sorted_midi]
 
     #     return cls.from_intervals(intervals)
@@ -152,7 +152,7 @@ class ChordShape(Enum):
     #     similar_shapes: set[ChordShape] = set()
     #     similar_intervals: set[Intervals] = set()
     #     for interval in self.intervals:
-    #         similar_intervals = similar_intervals.union({Intervals.P0})  # TODO
+    #         similar_intervals = similar_intervals.union({Interval.P0})  # TODO
 
     #     for shape in ChordShape:
     #         if shape.intervals <= similar_intervals and len(shape.intervals) == len(self.intervals):
