@@ -1,5 +1,6 @@
+from enum import Enum
 
-from music_constants import *
+from base_objects import *
 
 class DegreeChordsFromScale:
     # Similar in terms of common notes, shape, distance to the cycles
