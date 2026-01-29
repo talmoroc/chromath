@@ -1,4 +1,8 @@
 from __future__ import annotations
+
+import os
+if os.getcwd() == 'C:\\Users\\tomco\\dev\\repos\\chord-generator-prototype': os.chdir('./engine_utils')
+
 from collections.abc import Sequence
 from typing import Iterable
 import dissonance_computation as utils
