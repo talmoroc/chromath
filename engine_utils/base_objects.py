@@ -206,19 +206,17 @@ class Cycles:
 @dataclass(frozen=True)
 class Scale:
     degree_semitones: list[int]
-    _tones: int = MS.tones
-    _degrees: int = MS.degrees
 
     def __post_init__(self):
-        if len(self.degree_semitones) != self._degrees:
-            raise ValueError(f'Need {self._degrees} notes, got {len(self.degree_semitones)}')
+        if len(self.degree_semitones) != MS.degrees:
+            raise ValueError(f'Need {MS.degrees} notes, got {len(self.degree_semitones)}')
         for st in self.degree_semitones:
-            if not 0 <= st < self._tones:
-                raise ValueError(f'Semitones must be between 0 and {self._tones}, got {self.degree_semitones}')
+            if not 0 <= st < MS.tones:
+                raise ValueError(f'Semitones must be between 0 and {MS.tones}, got {self.degree_semitones}')
 
     def __str__(self): return f"Scale({self.degree_semitones})"
     def __repr__(self): return f"<{self.__class__.__name__}: {self.__str__()}>"
-    def __getitem__(self, deg: int): return self.degree_semitones[(deg - 1) % self._degrees]
+    def __getitem__(self, deg: int): return self.degree_semitones[(deg - 1) % MS.degrees]
     def __len__(self): return len(self.degree_semitones)
 
     @classmethod
@@ -229,21 +227,21 @@ class Scale:
 
     @cached_property
     def semitones_diff(self) -> list[int]:
-        return np.diff(self.degree_semitones, prepend=self.degree_semitones[-1] - self._tones).tolist()
+        return np.diff(self.degree_semitones, prepend=self.degree_semitones[-1] - MS.tones).tolist()
 
     @cached_property
     def mask(self) -> list[int]:
-        mask = np.zeros(self._tones, dtype=int)
+        mask = np.zeros(MS.tones, dtype=int)
         mask[self.degree_semitones] = 1
         return mask.tolist()
 
     def shift(self, start_degree: int) -> Scale:
-        new_semitones = np.roll(self.degree_semitones, start_degree % self._degrees)
-        new_semitones = (new_semitones - new_semitones[0]) % self._tones
+        new_semitones = np.roll(self.degree_semitones, start_degree % MS.degrees)
+        new_semitones = (new_semitones - new_semitones[0]) % MS.tones
         return Scale(new_semitones.tolist())
 
     def transpose(self, start_pitch: int):
-        return Scale([(st + start_pitch) % self._tones for st in self.degree_semitones])
+        return Scale([(st + start_pitch) % MS.tones for st in self.degree_semitones])
 
     ########### POSSIBLE EXTENSIONS ###############
     # NOTE: intervals calculation may be externalized. You need to compute intervals from scales or chords.
@@ -254,12 +252,12 @@ class Scale:
 
     @cached_property
     def intervals(self) -> list[Interval]:
-        return [Interval(degree + 1, self[degree + 1]) for degree in range(self._degrees)]
+        return [Interval(degree + 1, self[degree + 1]) for degree in range(MS.degrees)]
 
     # intervals from all degrees
     @cached_property
     def all_intervals(self) -> set[Interval]:
-        return set([interval for i in range(self._degrees) for interval in self.shift(i).intervals])
+        return set([interval for i in range(MS.degrees) for interval in self.shift(i).intervals])
 
 
 class Scales:
