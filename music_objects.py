@@ -3,8 +3,9 @@ import time
 import mido
 import threading
 
-from engine_utils.music_constants import *
-import engine_utils.computation_utils as utils
+from engine_utils.base_objects import *
+from engine_utils.chord_shapes import *
+import engine_utils.dissonance_computation as utils
 
 
 class Note:
@@ -55,7 +56,7 @@ class Note:
 
     @classmethod
     def from_pitch(cls, pitch: Pitch, octave: int = 0):
-        return cls(pitch.value + (octave + 1) * 12)
+        return cls(pitch.sounding_pitch + (octave + 1) * 12)
 
 
 class Chord:
@@ -83,8 +84,8 @@ class Chord:
         return f"Root: MIDI Note {self.root.midi} with frequency {self.root.freq} Hz\n {(self.root.pitch)} {self.shape} Chord in inversion {self.inversion}. Ambiguous root: {self.root_is_ambiguous}"
 
     @classmethod
-    def from_shape(cls, root: Note, chord_shape: utils.ChordShape):
-        notes = [root + i.semitones for i in chord_shape.intervals]
+    def from_shape(cls, root: Note, chord_shape: ChordShape):
+        notes = [root + i.pitch for i in chord_shape.intervals]
         return cls(notes)
 
     @property
