@@ -64,5 +64,3 @@ for midi_note in range(0, 128):
     filename = os.path.join(OUTPUT_DIR, f"note_{midi_note:03d}.wav")
     wavfile.write(filename, SAMPLE_RATE, wave)
     print(f"Generated {filename} ({freq:.2f} Hz)")
-
-print("Done!")

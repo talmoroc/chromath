@@ -2,6 +2,19 @@ from enum import Enum
 
 from base_objects import *
 
+@dataclass(frozen=True)
+class MusicSystem:
+    tones: int = 12
+    degrees: int = 7
+    func_degrees: int = 13  # degrees meaningful for intervals
+    powers: NDArray[np.int_] = field(init=False, repr=False)  # bitwise representation of tones
+    max_int_repr: int = field(init=False, repr=False)
+
+    def __post_init__(self):
+        powers: NDArray = 1 << np.arange(self.tones, dtype=object)
+        object.__setattr__(self, 'powers', powers)
+        object.__setattr__(self, 'max_int_repr', int(powers.sum()))
+
 class DegreeChordsFromScale:
     # Similar in terms of common notes, shape, distance to the cycles
     # common notes = equivalence between chords. (Also check scale transposition similarity ?)
