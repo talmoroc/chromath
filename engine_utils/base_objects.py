@@ -278,11 +278,15 @@ class Scales:
 class Pitch:
     absolute_pitch: int
     accidentals: int = 0
-    _tones: int = MS.tones
+    MS.tones: int = MS.tones
 
     def __post_init__(self):
-        if not 0 <= self.absolute_pitch < self._tones:
-            self.absolute_pitch = self.absolute_pitch % self._tones
+        if not 0 <= self.absolute_pitch < MS.tones:
+            self.absolute_pitch = self.absolute_pitch % MS.tones
+            
+    @classmethod
+    def from_midi(cls, midi_value) -> Pitch:
+        return Pitch(midi_value % MS.tones, 0)
 
     def __str__(self):
         return f'Pitch({self.absolute_pitch}, {self.accidentals})'
@@ -298,12 +302,12 @@ class Pitch:
     def __sub__(self, other: Pitch | int):
         if isinstance(other, Pitch):
             return Pitch(self.absolute_pitch - other.absolute_pitch, self.accidentals - other.accidentals)
-        return Pitch((self.absolute_pitch - other) % self._tones, self.accidentals)
+        return Pitch((self.absolute_pitch - other) % MS.tones, self.accidentals)
 
     def __add__(self, other: Pitch | int):
         if isinstance(other, Pitch):
-            return Pitch((self.absolute_pitch + other.absolute_pitch) % self._tones, self.accidentals + other.accidentals)
-        return Pitch((self.absolute_pitch + other) % self._tones, self.accidentals)
+            return Pitch((self.absolute_pitch + other.absolute_pitch) % MS.tones, self.accidentals + other.accidentals)
+        return Pitch((self.absolute_pitch + other) % MS.tones, self.accidentals)
 
     def shift(self, semitones: int): return Pitch(self.absolute_pitch + semitones, self.accidentals)
     def alter(self, accidentals: int): return Pitch(self.absolute_pitch, self.accidentals + accidentals)
