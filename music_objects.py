@@ -72,7 +72,8 @@ class Chord:
                           12 for note in self.notes]
         self.frequencies = [note.freq for note in self.notes]
         self.intervals = [
-            Interval.from_semitones((i - self.lowest_note).note_index, prefer_thirds=True) for i in self.notes
+            Interval.P0, Interval.M3, Interval.P5
+            # Interval.from_semitones((i - self.lowest_note).note_index) for i in self.notes
         ]
         self.relative_periodicity = utils.relative_periodicity(self.semitones)
         self.dissonance = utils.smoothed_relative_periodicity(
@@ -131,16 +132,16 @@ class Chord:
     def root_position_dissonance(self) -> float:
         return self.most_probable_quality[3]
 
-    @property
-    def similar(self) -> set[Chord]:
-        similar_chords = set()
-        for index in range(len(self.notes)):
-            inversion = self.invert(index)
-            for shape in ChordShape.from_intervals(inversion.intervals).similar:
-                if shape != ChordShape.UNKNOWN:
-                    similar_chords.add(Chord.from_shape(
-                        self.notes[index], shape))
-        return similar_chords
+    # @property
+    # def similar(self) -> set[Chord]:
+    #     similar_chords = set()
+    #     for index in range(len(self.notes)):
+    #         inversion = self.invert(index)
+    #         for shape in ChordShape.from_intervals(inversion.intervals).similar:
+    #             if shape != ChordShape.UNKNOWN:
+    #                 similar_chords.add(Chord.from_shape(
+    #                     self.notes[index], shape))
+    #     return similar_chords
 
     def invert(self, index: int = 1) -> Chord:
         new_notes = self.notes[index:]
