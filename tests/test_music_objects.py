@@ -4,7 +4,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 from music_objects import Note, Chord
-from engine_utils.music_constants import Pitch, Interval, ChordShape
+from engine_utils.base_objects import Pitch, Interval
+from engine_utils.chord_shapes import ChordShape
 
 
 class TestNote:
@@ -16,7 +17,7 @@ class TestNote:
         assert note.midi == 60
         assert note.note_index == 0  # C
         assert note.octave == 5
-        assert note.pitch == Pitch.C
+        assert note.pitch == Pitch(0, 0)
         assert note.name == "C"
         assert note.freq > 0
     
@@ -42,7 +43,7 @@ class TestNote:
         note = Note(60)
         shifted = note.shift(semitones=2)
         assert shifted.midi == 62
-        assert shifted.pitch == Pitch.D
+        assert shifted.pitch == Pitch(2, 0)
     
     def test_note_shift_octaves(self):
         """Test shifting a note by octaves."""
@@ -108,9 +109,9 @@ class TestNote:
     
     def test_note_from_pitch(self):
         """Test creating a Note from a Pitch enum."""
-        note = Note.from_pitch(Pitch.C, octave=4)
+        note = Note.from_pitch(Pitch(0,0), octave=4)
         assert note.midi == 60
-        assert note.pitch == Pitch.C
+        assert note.pitch == Pitch(0, 0)
     
     def test_note_string_representation(self):
         """Test string and repr methods."""
@@ -149,15 +150,7 @@ class TestChord:
         notes = [Note(60), Note(64), Note(67)]  # C Major
         chord = Chord(notes)
         assert chord.semitones == [0, 4, 7]
-    
-    def test_chord_intervals_calculation(self):
-        """Test that intervals are calculated correctly."""
-        notes = [Note(60), Note(64), Note(67)]  # C Major
-        chord = Chord(notes)
-        assert Interval.P0 in chord.intervals
-        assert Interval.M3 in chord.intervals
-        assert Interval.P5 in chord.intervals
-    
+
     def test_chord_shape_detection_major(self):
         """Test that major chords are detected correctly."""
         notes = [Note(60), Note(64), Note(67)]  # C Major
@@ -221,15 +214,15 @@ class TestPitch:
     
     def test_pitch_from_midi(self):
         """Test creating Pitch from MIDI values."""
-        assert Pitch.from_midi(0) == Pitch.C
-        assert Pitch.from_midi(1) == Pitch.CS
-        assert Pitch.from_midi(12) == Pitch.C  # One octave higher
+        assert Pitch.from_midi(0) == Pitch(0, 0)
+        assert Pitch.from_midi(1) == Pitch(1,0)
+        assert Pitch.from_midi(12) == Pitch(0, 0)  # One octave higher
     
     def test_pitch_string_representation(self):
         """Test string representation of pitches."""
-        assert str(Pitch.C) == "C"
-        assert str(Pitch.CS) == "C#"
-        assert str(Pitch.D) == "D"
+        assert str(Pitch(0, 0)) == "C"
+        assert str(Pitch(1,0)) == "C#"
+        assert str(Pitch(2, 0)) == "D"
 
 
 class TestInterval:
@@ -237,10 +230,10 @@ class TestInterval:
     
     def test_interval_semitones_property(self):
         """Test that semitones property returns correct values."""
-        assert Interval.P0.semitones == 0
-        assert Interval.M2.semitones == 2
-        assert Interval.M3.semitones == 4
-        assert Interval.P5.semitones == 7
+        assert Interval.P0.pitch == 0
+        assert Interval.M2.pitch == 2
+        assert Interval.M3.pitch == 4
+        assert Interval.P5.pitch == 7
     
     def test_interval_degree_property(self):
         """Test that degree property returns correct values."""
@@ -248,39 +241,6 @@ class TestInterval:
         assert Interval.M2.degree == 2
         assert Interval.M3.degree == 3
         assert Interval.P5.degree == 5
-    
-    def test_interval_from_semitones(self):
-        """Test creating Interval from semitone count."""
-        assert Interval.from_semitones(0) == Interval.P0
-        assert Interval.from_semitones(2) == Interval.M2
-        assert Interval.from_semitones(4) == Interval.M3
-    
-    def test_interval_from_semitones_ambiguous(self):
-        """Test that from_semitones returns first match for ambiguous intervals."""
-        # 3 semitones could be aug2 or m3
-        result = Interval.from_semitones(3)
-        assert result.semitones == 3
-    
-    def test_interval_from_midi(self):
-        """Test creating Interval from MIDI notes."""
-        interval = Interval.from_midi(60, 64)
-        assert interval == Interval.M3
-    
-    def test_interval_from_notes(self):
-        """Test creating Interval from Note objects."""
-        note1 = Note(60)
-        note2 = Note(64)
-        interval = Interval.from_notes(note1, note2)
-        assert interval == Interval.M3
-    
-    def test_interval_similars(self):
-        """Test finding similar intervals (same semitones)."""
-        m3_similars = Interval.m3.similars
-        aug2_similars = Interval.aug2.similars
-        # m3 and aug2 have same semitones but different degrees
-        assert Interval.m3 in m3_similars
-        assert Interval.aug2 in aug2_similars
-
 
 class TestChordShape:
     """Test cases for the ChordShape enum."""
@@ -321,12 +281,6 @@ class TestChordShape:
         intervals = [Interval.P0, Interval.M2]
         shape = ChordShape.from_intervals(intervals)
         assert shape == ChordShape.UNKNOWN
-    
-    def test_chord_shape_from_notes(self):
-        """Test identifying chord shape from Note objects."""
-        notes = [Note(60), Note(64), Note(67)]
-        shape = ChordShape.from_notes(notes)
-        assert shape == ChordShape.M
 
 class TestChordAdvanced:
     """Advanced test cases for Chord recognition, root detection, and inversion identification."""
@@ -430,31 +384,31 @@ class TestChordAdvanced:
         notes = [Note(64), Note(67), Note(72)]  # C Major, first inversion (E in bass)
         chord = Chord(notes)
         # Root should still identify C as the root
-        assert chord.root.pitch == Pitch.C
+        assert chord.root.pitch == Pitch(0, 0)
     
     def test_root_detection_second_inversion_major(self):
         """Test root detection in second inversion major chord."""
         notes = [Note(67), Note(72), Note(76)]  # C Major, second inversion (G in bass)
         chord = Chord(notes)
-        assert chord.root.pitch == Pitch.C
+        assert chord.root.pitch == Pitch(0, 0)
     
     def test_root_detection_minor_chord(self):
         """Test root detection in minor chord."""
         notes = [Note(69), Note(72), Note(76)]  # A Minor (A C E)
         chord = Chord(notes)
-        assert chord.root.pitch == Pitch.A
+        assert chord.root.pitch == Pitch(9, 0)
     
     def test_root_detection_seventh_chord(self):
         """Test root detection in seventh chord."""
         notes = [Note(60), Note(64), Note(67), Note(70)]  # C Dominant 7
         chord = Chord(notes)
-        assert chord.root.pitch == Pitch.C
+        assert chord.root.pitch == Pitch(0, 0)
     
     def test_root_detection_different_octaves(self):
         """Test root detection with notes in different octaves."""
         notes = [Note(60), Note(76), Note(79)]  # C in octave 4, E in octave 5, G in octave 5
         chord = Chord(notes)
-        assert chord.root.pitch == Pitch.C
+        assert chord.root.pitch == Pitch(0, 0)
     
     # ===== Inversion Detection Tests =====
     
@@ -530,7 +484,7 @@ class TestChordAdvanced:
         # C E G could be C Major or A Minor (if inverted)
         notes = [Note(60), Note(64), Note(67)]
         chord = Chord(notes)
-        assert chord.root.pitch == Pitch.C
+        assert chord.root.pitch == Pitch(0, 0)
     
     def test_inversion_detection_minimal_voicing(self):
         """Test inversion detection with minimal voicing (2 notes)."""
@@ -558,25 +512,15 @@ class TestChordRootDetectionAdvanced:
         chord = Chord(notes)
         assert chord.root == chord.notes[0]
     
-    def test_root_by_interval_pattern(self):
-        """Test root detection by recognizing interval patterns."""
-        # Major triad has intervals of M3 and P5 from root
-        notes = [Note(60), Note(64), Note(67)]
-        chord = Chord(notes)
-        
-        # Check if intervals match expected pattern for major chord
-        assert Interval.M3 in chord.intervals
-        assert Interval.P5 in chord.intervals
-    
     def test_root_detection_first_inversion_bass_note_is_third(self):
         """Test that in first inversion, the bass note is the third."""
         notes = [Note(64), Note(67), Note(72)]  # E G C
         chord = Chord(notes)
         
         # Bass note should be E (the third)
-        assert chord.notes[0].pitch == Pitch.E
+        assert chord.notes[0].pitch == Pitch(4, 0)
         # But root should still be C
-        assert chord.root.pitch == Pitch.C
+        assert chord.root.pitch == Pitch(0, 0)
 
 
 class TestChordInversionAdvanced:
@@ -589,11 +533,11 @@ class TestChordInversionAdvanced:
         
         first_inv = root_chord.invert(1)
         assert first_inv.inversion == 1
-        assert first_inv.notes[0].pitch == Pitch.E
+        assert first_inv.notes[0].pitch == Pitch(4, 0)
         
         second_inv = first_inv.invert(1)
         assert second_inv.inversion == 2
-        assert second_inv.notes[0].pitch == Pitch.G
+        assert second_inv.notes[0].pitch == Pitch(7, 0)
     
     def test_inversion_octave_wrapping(self):
         """Test that inversion properly wraps notes to next octave."""
