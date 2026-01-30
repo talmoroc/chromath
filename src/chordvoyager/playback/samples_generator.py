@@ -23,10 +23,6 @@ def generate_sine_wave(freq, duration, sample_rate):
     t = np.linspace(0, duration, int(sample_rate * duration), False)
     # Fundamental frequency
     wave = np.sin(2 * np.pi * freq * t)*0.1
-    # Add harmonics with decreasing amplitude
-    # for harmonic in range(2, 5):  # Add 2nd, 3rd, and 4th harmonics
-    #     amplitude = 1 / harmonic  # Amplitude decreases with harmonic number
-    #     wave += amplitude * np.sin(2 * np.pi * freq * harmonic * t) *0.5
     return wave, t
 
 
@@ -34,7 +30,7 @@ def generate_sine_wave(freq, duration, sample_rate):
 def apply_lowpass_filter(wave, cutoff_freq, sample_rate):
     nyquist = sample_rate / 2
     normalized_cutoff = cutoff_freq / nyquist
-    # b, a = signal.butter(4, normalized_cutoff, btype='low')
+    b, a = signal.butter(4, normalized_cutoff, btype='low')
     return wave
 
 
