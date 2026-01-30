@@ -13,7 +13,11 @@ dependencies = [
 
 [project.optional-dependencies]
 playback = [
+    "fastapi>=0.128.0",
     "mido>=1.3.3",
+    "pydantic>=2.12.5",
+    "scipy>=1.17.0",
+    "uvicorn>=0.40.0",
 ]
 
 [build-system]
@@ -22,6 +26,8 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "ipython>=9.9.0",
+    "jupyter>=1.1.1",
     "pytest>=9.0.2",
     "ruff>=0.14.14",
 ]
