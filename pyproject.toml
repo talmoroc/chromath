@@ -1,39 +1,27 @@
-[build-system]
-requires = ["setuptools>=65.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "chord-generator-prototype"
+name = "chordvoyager"
 version = "0.1.0"
-description = "A prototype for generating musical chords"
+description = "Chord Analysis and Generation Library"
 readme = "README.md"
-requires-python = ">=3.14"
-license = {text = "MIT"}
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    { name = "monotom", email = "tom.coral@outlook.com" }
 ]
-keywords = ["music", "chords", "generator"]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3.14",
-]
-
+requires-python = ">=3.13"
 dependencies = [
-    "numpy>=1.21.0",
+    "numpy>=2.4.1",
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=7.0",
-    "black>=22.0",
-    "flake8>=4.0",
-    "mypy>=0.950",
+playback = [
+    "mido>=1.3.3",
 ]
 
-[project.urls]
-Homepage = "https://github.com/tomco/chord-generator-prototype"
-Repository = "https://github.com/tomco/chord-generator-prototype.git"
+[build-system]
+requires = ["uv_build>=0.9.28,<0.10.0"]
+build-backend = "uv_build"
 
-[tool.ty.environment]
-root = ["./"]
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.14.14",
+]
