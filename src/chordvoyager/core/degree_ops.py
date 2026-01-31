@@ -1,8 +1,7 @@
 import numpy as np
 
-from src.chordvoyager.types import DegreeVec
-from src.chordvoyager.constants import DefaultMusicSystem as MS
-
+from ..types import DegreeVec
+from ..constants import DefaultMusicSystem as MS
 
 def to_int(v: DegreeVec) -> int:
     return int(np.dot(v, MS.powers)) # TODO

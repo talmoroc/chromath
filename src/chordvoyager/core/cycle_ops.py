@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-from src.chordvoyager.types import (
+from ..types import (
     DTYPE,
     NDArray,
     NDArrayInt8,
@@ -12,7 +12,7 @@ from src.chordvoyager.types import (
     #CycleDirection,
 )
 
-from src.chordvoyager.constants import DefaultMusicSystem as MS
+from ..constants import DefaultMusicSystem as MS
 
 def generate(
     step: int,

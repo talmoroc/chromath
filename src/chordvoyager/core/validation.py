@@ -1,11 +1,11 @@
-from src.chordvoyager.constants import DefaultMusicSystem as MS
-from src.chordvoyager.types import (
+from ..types import (
     DTYPE,
     NDArray,
     ChromaVec,
     DegreeVec,
     ScaleChromaVec,
 )
+from ..constants import DefaultMusicSystem as MS
 
 
 def validate_degree(v: NDArray) -> DegreeVec:
