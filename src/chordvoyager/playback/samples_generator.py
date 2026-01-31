@@ -22,7 +22,7 @@ def midi_to_freq(midi_note):
 def generate_sine_wave(freq, duration, sample_rate):
     t = np.linspace(0, duration, int(sample_rate * duration), False)
     # Fundamental frequency
-    wave = np.sin(2 * np.pi * freq * t)*0.1
+    wave = np.sin(2 * np.pi * freq * t) * 0.1
     return wave, t
 
 
@@ -30,7 +30,7 @@ def generate_sine_wave(freq, duration, sample_rate):
 def apply_lowpass_filter(wave, cutoff_freq, sample_rate):
     nyquist = sample_rate / 2
     normalized_cutoff = cutoff_freq / nyquist
-    b, a = signal.butter(4, normalized_cutoff, btype='low')
+    b, a = signal.butter(4, normalized_cutoff, btype="low")
     return wave
 
 

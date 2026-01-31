@@ -13,9 +13,7 @@ from ..core.conversion import chroma_to_degree
 def generate(v: NDArrayBool | NDArrayInt8 | int) -> ChromaVec:
     if isinstance(v, int):
         if v >= MS.max_int_repr:
-            raise ValueError(
-                f"Bitwise representation must be less than {MS.max_int_repr}, got {v}"
-            )
+            raise ValueError(f"Bitwise representation must be less than {MS.max_int_repr}, got {v}")
         vector = np.array([(v >> i) & 1 for i in range(MS.tones)])
         return validate_chroma(vector)
     elif isinstance(v, np.ndarray) and v.dtype == np.int8:
@@ -27,11 +25,13 @@ def generate(v: NDArrayBool | NDArrayInt8 | int) -> ChromaVec:
     else:
         raise TypeError(f"Unsupported input type: {type(v)}")
 
+
 def to_int(v: ChromaVec) -> int:
     return int(np.dot(v, MS.powers))
 
+
 def shift(v: ChromaVec, n: int) -> ChromaVec:
-    return np.roll(v, n) # TODO: check if bitwise op is faster
+    return np.roll(v, n)  # TODO: check if bitwise op is faster
 
 
 def invert(v, pivot: int = 0) -> ChromaVec:
@@ -44,10 +44,10 @@ def invert(v, pivot: int = 0) -> ChromaVec:
 
 # UTILITIES
 
+
 def isin(v: ChromaVec, e: ChromaVec) -> bool:
     return np.sum(v) == np.sum(v * e)  # TODO
+
+
 # TODO: check if this works depending on dimensions
 # TODO: check if this works for a matrix product
-
-
-

@@ -3,6 +3,7 @@ from ..types import ChromaVec, DegreeVec, ScaleChromaVec
 from ..constants import DefaultMusicSystem as MS
 from . import validation as val
 
+
 def chroma_to_degree(v: ChromaVec) -> DegreeVec:
     deg = np.flatnonzero(v)
     return val.validate_degree(deg)

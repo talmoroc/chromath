@@ -11,7 +11,7 @@ def approximate_frequency_ratio(
     f1: float, f2: float, d: float = 0.01, divide_by: int = 1
 ) -> tuple[int, int, float]:
     r_init = f2 / f1
-    r_min, r_max = r_init * (1 - d), r_init * (1 + d)
+    r_min, r_max = (r_init * (1 - d), r_init * (1 + d))
     a_low, b_low = math.floor(r_init), 1
     a_high, b_high = math.ceil(r_init), 1
     a, b = round(r_init), 1
@@ -22,11 +22,11 @@ def approximate_frequency_ratio(
         if r_init < r:
             a_high, b_high = a, b
             k = math.floor((r0 * b_low - a_low) / (a_high - r0 * b_high))
-            a_low, b_low = a_low + k * a_high, b_low + k * b_high
+            a_low, b_low = (a_low + k * a_high, b_low + k * b_high)
         else:
             a_low, b_low = a, b
             k = math.floor((a_high - r0 * b_high) / (r0 * b_low - a_low))
-            a_high, b_high = a_high + k * a_low, b_high + k * b_low
+            a_high, b_high = (a_high + k * a_low, b_high + k * b_low)
         a, b = a_low + a_high, b_low + b_high
         r = a / b
     b = b * divide_by
@@ -76,9 +76,7 @@ def smoothed_relative_periodicity(
     return smoothed_periodicity
 
 
-def midi_interval_ratio(
-    midi1: int, midi2: int, d: float = 0.011
-) -> tuple[int, int, float]:
+def midi_interval_ratio(midi1: int, midi2: int, d: float = 0.011) -> tuple[int, int, float]:
     f1 = midi_freq(midi1)
     f2 = midi_freq(midi2)
     return approximate_frequency_ratio(f1, f2, d)

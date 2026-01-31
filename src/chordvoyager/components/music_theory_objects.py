@@ -33,9 +33,7 @@ class Tone:
 
 class Chroma:
     def __init__(self, data: ArrayLike):
-        arr: ChromaVec = val.validate_chroma(
-            np.array(data, copy=True).ravel()
-        )  # Conversion
+        arr: ChromaVec = val.validate_chroma(np.array(data, copy=True).ravel())  # Conversion
         arr.flags.writeable = False  # Immutability
         self.vector: ChromaVec = arr
         self.degrees: DegreeVec = chr_op.chroma_to_degree(self.vector)
@@ -63,14 +61,10 @@ class Cycle:
         start = 0 if index.start is None else index.start
         dividend = start // MS.tones
         start -= MS.tones * dividend
-        stop = (
-            start + MS.tones if index.stop is None else index.stop - MS.tones * dividend
-        )
+        stop = start + MS.tones if index.stop is None else index.stop - MS.tones * dividend
         step = 1 if index.step is None else index.step % MS.tones
         if not self.is_complete:
-            return np.array(
-                [self[i] for i in range(start, stop, step)], dtype=DTYPE.Cycle
-            )
+            return np.array([self[i] for i in range(start, stop, step)], dtype=DTYPE.Cycle)
         indices = np.arange(start, stop, step) * self.step % MS.tones
         return self.rank_matrix.view()[0, indices]
 
@@ -93,9 +87,7 @@ class Cycle:
     @cached_property
     def rank_matrix(self) -> NDArrayInt8:
         idx = np.arange(MS.tones)
-        cycle_semitones = (
-            np.arange(0, self.step * self.periodicity, self.step) % MS.tones
-        )
+        cycle_semitones = np.arange(0, self.step * self.periodicity, self.step) % MS.tones
         mask = np.zeros(MS.tones, dtype=DTYPE.Cycle)
         cycle_asc = np.zeros(MS.tones, dtype=DTYPE.Cycle)
         mask[cycle_semitones] = 1
@@ -137,9 +129,7 @@ class Scale:
 
     def __post_init__(self):
         if len(self.degree_semitones) != MS.degrees:
-            raise ValueError(
-                f"Need {MS.degrees} notes, got {len(self.degree_semitones)}"
-            )
+            raise ValueError(f"Need {MS.degrees} notes, got {len(self.degree_semitones)}")
         for st in self.degree_semitones:
             if not 0 <= st < MS.tones:
                 raise ValueError(
@@ -168,9 +158,7 @@ class Scale:
 
     @cached_property
     def semitones_diff(self) -> list[int]:
-        return np.diff(
-            self.degree_semitones, prepend=self.degree_semitones[-1] - MS.tones
-        ).tolist()
+        return np.diff(self.degree_semitones, prepend=self.degree_semitones[-1] - MS.tones).tolist()
 
     @cached_property
     def mask(self) -> list[int]:
@@ -204,13 +192,7 @@ class Scale:
     # intervals from all degrees
     @cached_property
     def all_intervals(self) -> set[Interval]:
-        return set(
-            [
-                interval
-                for i in range(MS.degrees)
-                for interval in self.shift(i).intervals
-            ]
-        )
+        return set([interval for i in range(MS.degrees) for interval in self.shift(i).intervals])
 
 
 class Scales:
@@ -307,9 +289,7 @@ class Pitch:
 class Tonality:
     def __init__(self, root: int, scale: Scale):
         if not 0 <= root <= 11:
-            raise ValueError(
-                f"Tonality root must be a pitch between 0 and 11, got {root}"
-            )
+            raise ValueError(f"Tonality root must be a pitch between 0 and 11, got {root}")
         self.root = root  # Flatten accidentals for the root of a tonality
         self.scale = scale.transpose(self.root)  # Apply the scale to the root
         self.chroma = self.scale.chroma
@@ -405,9 +385,7 @@ def pitch_distance(p1: int | Pitch, p2: int | Pitch) -> int:
 class Note:
     def __init__(self, midi_value: int):
         if midi_value < 0 or midi_value > 127:
-            raise ValueError(
-                f"MIDI note must be between 0 and 127 - value {midi_value}"
-            )
+            raise ValueError(f"MIDI note must be between 0 and 127 - value {midi_value}")
         self.midi = midi_value
         self.note_index = self.midi % 12
         self.octave = self.midi // 12
@@ -476,9 +454,7 @@ class Chord:
         ]
         self.relative_periodicity = freq_op.relative_periodicity(self.semitones)
         self.dissonance = freq_op.smoothed_relative_periodicity(self.semitones)
-        self._dissonance_raw = freq_op.smoothed_relative_periodicity(
-            self.semitones, log=False
-        )
+        self._dissonance_raw = freq_op.smoothed_relative_periodicity(self.semitones, log=False)
 
     def __str__(self):
         return f"Root: MIDI Note {self.lowest_note.midi} with frequency {self.lowest_note.freq} Hz\n {(self.lowest_note.pitch)} {None} Chord in inversion {None}. Ambiguous root: {None}"
@@ -558,8 +534,14 @@ class Chord:
         """Compare chords by pitch class (ignoring inversion, octave, and repetition)."""
         if not isinstance(other, Chord):
             return False
-        self_pitches = sorted({n.pitch for n in self.notes}, key=lambda p: p.value)
-        other_pitches = sorted({n.pitch for n in other.notes}, key=lambda p: p.value)
+        self_pitches = sorted(
+            {n.pitch for n in self.notes},
+            key=lambda p: p.value,
+        )
+        other_pitches = sorted(
+            {n.pitch for n in other.notes},
+            key=lambda p: p.value,
+        )
         return self_pitches == other_pitches
 
 
@@ -585,4 +567,12 @@ class Interval:
         return self.functional_degree % MS.degrees
 
 
-__all__ = ["Pitch", "Interval", "Chord", "Cycle", "Scale", "Scales", "Tonality"]
+__all__ = [
+    "Pitch",
+    "Interval",
+    "Chord",
+    "Cycle",
+    "Scale",
+    "Scales",
+    "Tonality",
+]
