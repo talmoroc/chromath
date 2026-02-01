@@ -2,20 +2,18 @@ import numpy as np
 import math
 
 from ..types import (
-    DTYPE,
+    DT,
     NDArray,
     NDArrayInt8,
     ChromaVec,
-    CycleMatrix,
-    ToneToPositionMatrix,
-    PositionToToneMatrix,
-    # CycleDirection,
+    CycleVec,
+    RankToToneMap,
 )
 
 from ..constants import DefaultMusicSystem as MS
 
 
-def generate(step: int) -> tuple[PositionToToneMatrix, ToneToPositionMatrix, ChromaVec]:
+def generate(step: int) -> tuple[RankToToneMap, CycleVec, ChromaVec]:
     """
     Generator for a Cycle. The Cycle can be viewed as a cyclic mapping
     from integers (positive or negative) to tones (0-MusicSystem.tones).
@@ -34,28 +32,29 @@ def generate(step: int) -> tuple[PositionToToneMatrix, ToneToPositionMatrix, Chr
         step (int): the step of the Cycle, in semitones. Must be between 1 and the number of tones in the current Music System.
 
     Returns:
-        tuple[CycleMatrix, CycleMatrix, ChromaVec | None]:
-            1) CycleMatrix Position in the Cycle of the given tone : index = tone, value = its rank in the cycle
-            2) CycleMatrix Tone of the given position in the Cycle : index = position, value = tone
+        tuple[CycleVec, CycleVec, ChromaVec | None]:
+            1) CycleVec Position in the Cycle of the given tone : index = tone, value = its rank in the cycle
+            2) CycleVec Tone of the given position in the Cycle : index = position, value = tone
             3) Chromavec 1 = a tone is in the cycle, 0 = it is not. If the cycle is complete, it's full of 1.
-                Useful to check before using the first CycleMatrix (Position in the cycle of a given tone)
+                Useful to check before using the first CycleVec (Position in the cycle of a given tone)
     """
     if not 1 <= step < MS.tones:
         raise ValueError(f"Step must be between 1 and {MS.tones}: got {step}")
     pi = periodicity(step)
-    cycle_rank_st = np.arange(0, step * pi, step, dtype=DTYPE.Cycle) % MS.tones
-    cycle_st_rank = np.zeros(MS.tones)
+    cycle_rank_st = np.arange(0, step * pi, step) % MS.tones
+    cycle_st_rank = np.full(MS.tones, -1)
     cycle_st_rank[cycle_rank_st] = np.arange(pi)
-    tone_to_pos_mat = np.array([cycle_st_rank, reverse_ndarray(cycle_st_rank)], dtype=DTYPE.Cycle)
+    breakpoint()
+    tone_to_pos_mat = np.array([cycle_st_rank, reverse_ndarray(cycle_st_rank)], dtype=DT.Cycle)
     pos_to_tone_mat = np.array(
-        [cycle_rank_st, reverse_ndarray(cycle_rank_st)], dtype=DTYPE.Cycle
+        [cycle_rank_st, reverse_ndarray(cycle_rank_st)], dtype=DT.Cycle
     )  # TODO: does this work if cycle(0) != 0 ?
     # TODO: refactor in smaller functions to debug it easier
     if not is_complete(pi):
-        mask = np.zeros(MS.tones)
+        mask = np.zeros(MS.tones, dtype=DT.Chr)
         mask[cycle_rank_st] = 1
     else:
-        mask = np.full(MS.tones, 1, dtype=DTYPE.Chr)
+        mask = np.full(MS.tones, 1, dtype=DT.Chr)
     return tone_to_pos_mat, pos_to_tone_mat, mask
 
 
@@ -67,31 +66,28 @@ def is_complete(periodicity: int) -> bool:
     return periodicity == MS.tones
 
 
-# TODO: Clarify why two outputs are necessary. Also, mask = None or
-
-
 # CORE VECTOR OPERATIONS
 
 
-def reverse_ndarray(arr: NDArray) -> NDArray:
-    pivot = np.array(arr[0])
+def reverse_ndarray(arr: NDArray, pivot: int = 0) -> NDArray:
+    pivot_arr = [arr[pivot]]
     arr_len = arr.shape[0]
-    return np.array([pivot, arr[arr_len:0, -1]], dtype=arr.dtype)
+    return np.concat([pivot_arr, arr[arr_len:0:-1]], dtype=arr.dtype)
 
 
 # Should the formula for these two be different between the two CycleMatrices types ?
-def shift(c: CycleMatrix, n: int) -> CycleMatrix:
+def shift(c: CycleVec, n: int) -> CycleVec:
     return c  # TODO recursive rotation, nice formula
 
 
-def centered_on(c: CycleMatrix, tone: int) -> CycleMatrix:
+def centered_on(c: CycleVec, tone: int) -> CycleVec:
     return c  # TODO the matrix centered around a given tone.
 
 
 # UTILITIES
 
 
-def get_closest(tone: int, n: int, c: CycleMatrix) -> NDArrayInt8:
+def get_closest(tone: int, n: int, c: CycleVec) -> NDArrayInt8:
     return c  # TODO.
 
 
@@ -104,5 +100,5 @@ def get_closest(tone: int, n: int, c: CycleMatrix) -> NDArrayInt8:
 # Basically this would be rotate(c, tone)[:,:n+1]
 
 
-def dist(t1: int, t2: int, c: ToneToPositionMatrix) -> NDArray:
+def dist(t1: int, t2: int, c: CycleVec) -> NDArray:
     return np.array(t1)  # TODO shape = (1,2)

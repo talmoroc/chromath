@@ -1,6 +1,7 @@
 import numpy as np
 
 from ..types import (
+    DT,
     NDArrayBool,
     NDArrayInt8,
     ChromaVec,
@@ -39,7 +40,7 @@ def invert(v, pivot: int = 0) -> ChromaVec:
     new_mask = np.zeros(MS.tones)
     indices = (pivot - chroma_to_degree(v)) % MS.tones
     new_mask[indices] = 1
-    return new_mask
+    return new_mask.astype(DT.Chr)
 
 
 # UTILITIES

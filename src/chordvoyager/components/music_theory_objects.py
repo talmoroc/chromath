@@ -4,7 +4,7 @@ from functools import cached_property
 from dataclasses import dataclass
 from typing import overload, cast
 from numpy.typing import ArrayLike
-from ..types import ChromaVec, DegreeVec, CycleMatrix, DTYPE, NDArrayInt8
+from ..types import ChromaVec, DegreeVec, CycleVec, DT, NDArrayInt8
 
 import numpy as np
 
@@ -64,7 +64,7 @@ class Cycle:
         stop = start + MS.tones if index.stop is None else index.stop - MS.tones * dividend
         step = 1 if index.step is None else index.step % MS.tones
         if not self.is_complete:
-            return np.array([self[i] for i in range(start, stop, step)], dtype=DTYPE.Cycle)
+            return np.array([self[i] for i in range(start, stop, step)], dtype=DT.Cycle)
         indices = np.arange(start, stop, step) * self.step % MS.tones
         return self.rank_matrix.view()[0, indices]
 
@@ -81,15 +81,15 @@ class Cycle:
         return Chroma(val.validate_chroma(self.mask))
 
     @property
-    def cycle_matrix(self) -> CycleMatrix:
+    def cycle_matrix(self) -> CycleVec:
         return self.cycle
 
     @cached_property
     def rank_matrix(self) -> NDArrayInt8:
         idx = np.arange(MS.tones)
         cycle_semitones = np.arange(0, self.step * self.periodicity, self.step) % MS.tones
-        mask = np.zeros(MS.tones, dtype=DTYPE.Cycle)
-        cycle_asc = np.zeros(MS.tones, dtype=DTYPE.Cycle)
+        mask = np.zeros(MS.tones, dtype=DT.Cycle)
+        cycle_asc = np.zeros(MS.tones, dtype=DT.Cycle)
         mask[cycle_semitones] = 1
         cycle_asc[cycle_semitones] = np.arange(self.periodicity)
         cycle_desc = (self.periodicity - cycle_asc) % self.periodicity
@@ -97,7 +97,7 @@ class Cycle:
         return np.ma.array(
             [idx, cycle, cycle_asc, -cycle_desc],
             mask=np.tile((1 - mask), (4, 1)),
-            dtype=DTYPE,
+            dtype=DT,
         )
 
     @cached_property  # Access : pitch_to_rank[1|2, pitch] 1 = ascending, 2 = descending
@@ -112,7 +112,7 @@ class Cycle:
         else:
             ascending_rank = np.argsort(self.rank_matrix[2, :])
             descending_rank = np.argsort(-self.rank_matrix[3, :])
-        return np.array([ascending_rank, descending_rank], dtype=DTYPE)
+        return np.array([ascending_rank, descending_rank], dtype=DT)
 
 
 class Cycles:

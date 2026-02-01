@@ -185,3 +185,4 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 .python-version
+.vscode/launch.json

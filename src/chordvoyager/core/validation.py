@@ -1,5 +1,5 @@
 from ..types import (
-    DTYPE,
+    DT,
     NDArray,
     ChromaVec,
     DegreeVec,
@@ -13,7 +13,7 @@ def validate_degree(v: NDArray) -> DegreeVec:
         raise ValueError(f"Degree vectors have length {MS.degrees}, got {len(v)}")
     if not set(v) <= MS.tones_set:
         raise ValueError(f"Degree vectors have tones in [0-{MS.tones - 1}]")
-    return v.astype(DTYPE.Deg)
+    return v.astype(DT.Deg)
 
 
 def validate_chroma(v: NDArray) -> ChromaVec:
@@ -21,7 +21,7 @@ def validate_chroma(v: NDArray) -> ChromaVec:
         raise ValueError(f"Chroma vectors have length {MS.tones}, got {len(v)}")
     if not set(v) <= {0, 1}:
         raise ValueError(f"Chroma vectors are binary (0 or 1), got {set(v)}")
-    return v.astype(DTYPE.Chr)
+    return v.astype(DT.Chr)
 
 
 def validate_scale_chroma(v: NDArray) -> ScaleChromaVec:
