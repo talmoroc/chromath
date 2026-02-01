@@ -48,7 +48,7 @@ class Chroma:
 class Cycle:
     def __init__(self, step: int):
         self.step: int = step
-        self.cycle, _, self.mask = cycle_op.generate(self.step)
+        self.cycle, self.mask = cycle_op.generate_cycle_matrix(self.step)
 
     @overload
     def __getitem__(self, index: int) -> int: ...

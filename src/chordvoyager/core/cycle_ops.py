@@ -1,61 +1,9 @@
 import numpy as np
 import math
 
-from ..types import (
-    DT,
-    NDArray,
-    NDArrayInt8,
-    ChromaVec,
-    CycleVec,
-    RankToToneMap,
-)
+from ..types import DT, NDArray, ChromaVec, CycleVec, CycleMatrix, RankMatrix
 
 from ..constants import DefaultMusicSystem as MS
-
-
-def generate(step: int) -> tuple[RankToToneMap, CycleVec, ChromaVec]:
-    """
-    Generator for a Cycle. The Cycle can be viewed as a cyclic mapping
-    from integers (positive or negative) to tones (0-MusicSystem.tones).
-
-    - It is also useful to have the reverse : which are the 12 tones positions in the cycle
-
-    - Since we want vectors and the Cycle can go both ways, the output are matrices
-    with 2 lines : the first one for the cycle increasing the second one for the cycle
-    in negative direction.
-
-    - Given that most cycles are partial in 12-tone temperament the reverse mapping
-    is often partial, so in these cases a mask (ChromaVec) is returned to tell which
-    tones belong to the cycle.
-
-    Args:
-        step (int): the step of the Cycle, in semitones. Must be between 1 and the number of tones in the current Music System.
-
-    Returns:
-        tuple[CycleVec, CycleVec, ChromaVec | None]:
-            1) CycleVec Position in the Cycle of the given tone : index = tone, value = its rank in the cycle
-            2) CycleVec Tone of the given position in the Cycle : index = position, value = tone
-            3) Chromavec 1 = a tone is in the cycle, 0 = it is not. If the cycle is complete, it's full of 1.
-                Useful to check before using the first CycleVec (Position in the cycle of a given tone)
-    """
-    if not 1 <= step < MS.tones:
-        raise ValueError(f"Step must be between 1 and {MS.tones}: got {step}")
-    pi = periodicity(step)
-    cycle_rank_st = np.arange(0, step * pi, step) % MS.tones
-    cycle_st_rank = np.full(MS.tones, -1)
-    cycle_st_rank[cycle_rank_st] = np.arange(pi)
-    breakpoint()
-    tone_to_pos_mat = np.array([cycle_st_rank, reverse_ndarray(cycle_st_rank)], dtype=DT.Cycle)
-    pos_to_tone_mat = np.array(
-        [cycle_rank_st, reverse_ndarray(cycle_rank_st)], dtype=DT.Cycle
-    )  # TODO: does this work if cycle(0) != 0 ?
-    # TODO: refactor in smaller functions to debug it easier
-    if not is_complete(pi):
-        mask = np.zeros(MS.tones, dtype=DT.Chr)
-        mask[cycle_rank_st] = 1
-    else:
-        mask = np.full(MS.tones, 1, dtype=DT.Chr)
-    return tone_to_pos_mat, pos_to_tone_mat, mask
 
 
 def periodicity(step: int) -> int:
@@ -66,39 +14,82 @@ def is_complete(periodicity: int) -> bool:
     return periodicity == MS.tones
 
 
-# CORE VECTOR OPERATIONS
+def _generate_cycle_tones(step: int) -> CycleVec:
+    pi = periodicity(step)
+    return np.arange(0, step * pi, step, dtype=DT.Cycle) % MS.tones
 
 
-def reverse_ndarray(arr: NDArray, pivot: int = 0) -> NDArray:
-    pivot_arr = [arr[pivot]]
-    arr_len = arr.shape[0]
-    return np.concat([pivot_arr, arr[arr_len:0:-1]], dtype=arr.dtype)
+def _generate_cycle_vector(step: int) -> tuple[CycleVec, ChromaVec]:
+    """
+    Generator for a Cycle.
+
+    A Cycle can be viewed as a cyclic mapping
+    from integers (positive or negative) to tones (0-MusicSystem.tones).
+
+    - It is also useful to have the reverse : which are the 12 tones positions in the cycle.
+    Identical for the circle of fifth.
+
+    - Given that most cycles are partial in 12-tone temperament the reverse mapping
+    is often partial, so in these cases a mask (ChromaVec) is returned to tell which
+    tones belong to the cycle.
+
+    Args:
+        step (int): the step of the Cycle, in semitones. Must be between 1 and the number of tones in the current Music System.
+
+    Returns:
+        tuple[CycleVec, ChromaVec]:
+            1. cycle_vec : index = tone, value = its rank in the cycle, len = tones
+            2. mask : 1 = a tone is in the cycle, 0 = it is not. If the cycle is complete, it's full of 1.
+                Useful to check before using the first CycleVec (Position in the cycle of a given tone)
+    """
+    if not 1 <= step < MS.tones:
+        raise ValueError(f"Step must be between 1 and {MS.tones}: got {step}")
+    cycle_tones = _generate_cycle_tones(step)
+    cycle_vec = np.full(MS.tones, -1)
+    cycle_vec[cycle_tones] = np.arange(periodicity(step))
+    mask = np.where(cycle_vec == -1, 0, 1).astype(DT.Chr)
+    return cycle_vec, mask
+
+# Compute the cycle rank of the tones relative to each tone
+def _matrix_over_tones(c: CycleVec):
+    return np.array([(np.roll(c, i)) for i in range(MS.tones)], dtype=DT.Cycle)
 
 
-# Should the formula for these two be different between the two CycleMatrices types ?
-def shift(c: CycleVec, n: int) -> CycleVec:
-    return c  # TODO recursive rotation, nice formula
+def generate_cycle_matrix(step: int) -> CycleMatrix:
+    positive_vector, mask = _generate_cycle_vector(step)
+    positive_matrix = _matrix_over_tones(positive_vector)
+    negative_matrix = positive_matrix.transpose()  # possible because square matrix
+    return np.array([positive_matrix, negative_matrix], dtype=DT.Cycle)
+
+# Compute the cycle semitones series starting on each tone
+def _matrix_over_ranks(c: CycleVec):
+    return np.array([(c + i) % MS.tones for i in range(MS.tones)], dtype=DT.Cycle)
 
 
-def centered_on(c: CycleVec, tone: int) -> CycleVec:
-    return c  # TODO the matrix centered around a given tone.
+def generate_rank_matrix(step: int) -> RankMatrix:
+    pos_rank = _generate_cycle_tones(step)
+    neg_rank = _generate_cycle_tones(-step)
+    return np.array([_matrix_over_ranks(pos_rank), _matrix_over_ranks(neg_rank)], dtype=DT.Cycle)
 
 
 # UTILITIES
+def get_tone_from_rank(r: RankMatrix, rank: int, relative_to: int = 0) -> int:
+    return r[rank < 0, relative_to, rank]
 
 
-def get_closest(tone: int, n: int, c: CycleVec) -> NDArrayInt8:
-    return c  # TODO.
+def get_rank_from_tone(
+    c: CycleMatrix, tone: int, relative_to: int = 0
+) -> np.ndarray[tuple[int], np.dtype[DT.Cycle]]:
+    return c[:, relative_to, tone]
 
 
-# I need : to check where the tone is in the cycle so Tone To Position
-# Then I need to get the slice of size n around this position so Position to Tone
-# Or maybe I can vectorize and just do a translation of Position to Tone with the tone information
-# I just need to check how it behaves with the negative part of the cycle
-# But if this is the case the function is just a wrapper for rotate + slice
-# Need to find also how to handle when n >= cycle periodicity while staying in vector land
-# Basically this would be rotate(c, tone)[:,:n+1]
+def dist(c: CycleMatrix, tone1: int, tone2: int, signed=False) -> NDArray:
+    relative_rank = c[:, tone1, tone2]
+    dist = relative_rank.min()
+    if signed and relative_rank.argmin() == 1:
+        return -dist
+    return dist
 
 
-def dist(t1: int, t2: int, c: CycleVec) -> NDArray:
-    return np.array(t1)  # TODO shape = (1,2)
+def get_n_closest_tones(r: RankMatrix, tone: int, n: int = 1):
+    return r[:, tone, 1 : n + 1]

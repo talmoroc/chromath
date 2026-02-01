@@ -31,8 +31,12 @@ type DegreeVec = Annotated[
 type IntervalVec = Annotated[np.ndarray[tuple[int, int], np.dtype[DT.Deg]], ""]
 
 type CycleVec = Annotated[
-    np.ndarray[tuple[int], np.dtype[DT.Deg]],
+    np.ndarray[tuple[int], np.dtype[DT.Cycle]],
     "(MusicSystem.tones,) int8 array. Index = tone, Value = Position in the cycle, -1 if the tone is not in the cycle",
 ]
 
-type RankToToneMap = CycleVec
+type CycleMatrix = Annotated[
+    np.ndarray[tuple[int, int, int], np.dtype[DT.Cycle]],
+    "Matrix representing a cycle",
+]
+type RankMatrix = CycleMatrix
