@@ -26,45 +26,24 @@ type NDArrayInt64 = NDArray[np.int64]
 
 
 ## Chroma Types
-type Chroma = Annotated[Vec[DT.Chr], "(MS.tones,) bool array representing a mask over the tones"]
-
-type ScaleChroma = Annotated[Chroma, "Chroma with a fixed number of True values"]
-
-type ChromaMatrix = Annotated[Mat[DT.Chr], "Squatre matrix of chroma"]
+type Chroma = Annotated[Vec[DT.Chr], "(Tones,) bool mask"]
+type ScaleChroma = Annotated[Chroma, "(Tones,) bool mask with a fixed number of True values"]
+type ChromaMatrix = Annotated[Mat[DT.Chr], "Square matrix of chroma"]
+type ScaleChromaMatrix = Annotated[ChromaMatrix, "Square matrix of ScaleChroma"]
 
 ## Degree Types
-type Degrees = Annotated[Vec[DT.Deg], "Array for which Index = degree, Value = tone"]
-
-type ScaleDegrees = Annotated[Degrees, "DegreeVec with MS.degrees values"]
-
+type Degrees = Annotated[Vec[DT.Deg], "(N,) degree->tone map"]
+type ScaleDegrees = Annotated[Degrees, "(Degrees,) degree -> tone map"]
 type Interval = Annotated[Mat[DT.Deg], ""]
 
 
 ## Cycle Types
-type CycleVec = Annotated[
-    Vec[DT.Cycle],
-    "Vector representing a cycle from a starting point. vec[tone] = corresponding rank in the cycle or -1 if the tone is missing from the cycle",
-]
-
-type RankVec = Annotated[Vec[DT.Cycle], "Inverse of a CycleVec: vec[rank] = corresponding tone"]
-
+type CycleVec = Annotated[Vec[DT.Cycle], "(Tones,) tone->cycle_rank map (-1 if tone not in cycle)"]
+type RankVec = Annotated[Vec[DT.Cycle], "(Periodicity,) cycle_rank->tone map"]
 type CycleMatrix = Annotated[Mat[DT.Cycle], "Matrix of CycleVecs: (starting_tone, tone) -> rank"]
-
 type RankMatrix = Annotated[Mat[DT.Cycle], "Matrix of RankVecs: (starting_tone, rank) -> tone"]
 
-type SymCycleVec = Annotated[
-    Mat[DT.Cycle], "CycleVec with an added dimension for positive/negative direction of cycle"
-]
-
-type SymRankVec = Annotated[
-    Mat[DT.Cycle], "CycleVec with an added dimension for positive/negative direction of cycle"
-]
-
-
-type SymCycleMatrix = Annotated[
-    Cube[DT.Cycle], "CycleMatrix with an added dimension for positive/negative direction of cycle"
-]
-
-type SymRankMatrix = Annotated[
-    Cube[DT.Cycle], "RankMatrix with an added dimension for positive/negative direction of cycle"
-]
+type SymCycleVec = Annotated[Mat[DT.Cycle], "(dir, tone)->cycle_rank"]
+type SymRankVec = Annotated[Mat[DT.Cycle], "(dir, cycle_rank)->tone"]
+type SymCycleMatrix = Annotated[Cube[DT.Cycle], "(direction, starting_tone, tone) -> rank"]
+type SymRankMatrix = Annotated[Cube[DT.Cycle], "(direction, starting_tone, rank) -> tone"]
