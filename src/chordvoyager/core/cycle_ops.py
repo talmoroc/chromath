@@ -1,8 +1,13 @@
 import numpy as np
 import math
+from .validation import (
+    validate_cycle_vector,
+    validate_rank_matrix,
+    validate_cycle_matrix,
+    validate_chroma,
+)
 
 from ..types import DT, NDArray, ChromaVec, CycleVec, CycleMatrix, RankMatrix
-
 from ..constants import DefaultMusicSystem as MS
 
 
@@ -16,7 +21,8 @@ def is_complete(periodicity: int) -> bool:
 
 def _generate_cycle_tones(step: int) -> CycleVec:
     pi = periodicity(step)
-    return np.arange(0, step * pi, step, dtype=DT.Cycle) % MS.tones
+    cycle_tones = np.arange(0, step * pi, step, dtype=DT.Cycle) % MS.tones
+    return validate_cycle_vector(cycle_tones)
 
 
 def _generate_cycle_vector(step: int) -> tuple[CycleVec, ChromaVec]:
@@ -48,28 +54,36 @@ def _generate_cycle_vector(step: int) -> tuple[CycleVec, ChromaVec]:
     cycle_vec = np.full(MS.tones, -1)
     cycle_vec[cycle_tones] = np.arange(periodicity(step))
     mask = np.where(cycle_vec == -1, 0, 1).astype(DT.Chr)
-    return cycle_vec, mask
+    return validate_cycle_vector(cycle_vec), validate_chroma(mask)
+
 
 # Compute the cycle rank of the tones relative to each tone
-def _matrix_over_tones(c: CycleVec):
-    return np.array([(np.roll(c, i)) for i in range(MS.tones)], dtype=DT.Cycle)
+def _matrix_over_tones(c: CycleVec) -> np.ndarray[tuple[int, int], np.dtype[DT.Cycle]]:
+    ranks_relative_to_each_tone = [(np.roll(c, i)) for i in range(MS.tones)]
+    return np.array(ranks_relative_to_each_tone, dtype=DT.Cycle)
 
 
 def generate_cycle_matrix(step: int) -> CycleMatrix:
-    positive_vector, mask = _generate_cycle_vector(step)
-    positive_matrix = _matrix_over_tones(positive_vector)
-    negative_matrix = positive_matrix.transpose()  # possible because square matrix
-    return np.array([positive_matrix, negative_matrix], dtype=DT.Cycle)
+    pos_cycle_vec, mask = _generate_cycle_vector(step)
+    pos_cycle_mat = _matrix_over_tones(pos_cycle_vec)
+    neg_cycle_mat = pos_cycle_mat.transpose()  # possible because square matrix
+    cycle_matrix = np.array([pos_cycle_mat, neg_cycle_mat], dtype=DT.Cycle)
+    return validate_cycle_matrix(cycle_matrix)
+
 
 # Compute the cycle semitones series starting on each tone
-def _matrix_over_ranks(c: CycleVec):
-    return np.array([(c + i) % MS.tones for i in range(MS.tones)], dtype=DT.Cycle)
+def _matrix_over_ranks(c: CycleVec) -> np.ndarray[tuple[int, int], np.dtype[DT.Cycle]]:
+    semitones_series = [(c + i) % MS.tones for i in range(MS.tones)]
+    return np.array(semitones_series, dtype=DT.Cycle)
 
 
 def generate_rank_matrix(step: int) -> RankMatrix:
     pos_rank = _generate_cycle_tones(step)
     neg_rank = _generate_cycle_tones(-step)
-    return np.array([_matrix_over_ranks(pos_rank), _matrix_over_ranks(neg_rank)], dtype=DT.Cycle)
+    pos_rank_mat = _matrix_over_ranks(pos_rank)
+    neg_rank_mat = _matrix_over_ranks(neg_rank)
+    rank_matrix = np.array([pos_rank_mat, neg_rank_mat], dtype=DT.Cycle)
+    return validate_rank_matrix(rank_matrix)
 
 
 # UTILITIES
