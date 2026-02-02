@@ -4,7 +4,7 @@ from functools import cached_property
 from dataclasses import dataclass
 from typing import overload, cast
 from numpy.typing import ArrayLike
-from ..types import ChromaVec, DegreeVec, CycleVec, DT, NDArrayInt8
+from ..types import Chroma, Degrees, CycleVec, DT, NDArrayInt8
 
 import numpy as np
 
@@ -22,7 +22,7 @@ from ..constants import (
 
 class Tone:
     def shift(t: int, n: int) -> int:
-        return deg_op.shift(cast("DegreeVec", t), n)[0]
+        return deg_op.shift(cast("Degrees", t), n)[0]
 
     def to_chroma(t: int) -> Chroma:
         return Chroma(core_conv.degree_to_chroma(np.array(t)))
@@ -33,13 +33,13 @@ class Tone:
 
 class Chroma:
     def __init__(self, data: ArrayLike):
-        arr: ChromaVec = val.validate_chroma(np.array(data, copy=True).ravel())  # Conversion
+        arr: Chroma = val.validate_chroma(np.array(data, copy=True).ravel())  # Conversion
         arr.flags.writeable = False  # Immutability
-        self.vector: ChromaVec = arr
-        self.degrees: DegreeVec = chr_op.chroma_to_degree(self.vector)
+        self.vector: Chroma = arr
+        self.degrees: Degrees = chr_op.chroma_to_degree(self.vector)
 
     def shift(self, n: int) -> Chroma:
-        return Chroma(chr_op.shift(self.vector, n))
+        return Chroma(np.roll(self.vector, n))
 
     def invert(self, pivot: int = 0) -> Chroma:
         return Chroma(chr_op.invert(self.vector, pivot))
@@ -48,7 +48,7 @@ class Chroma:
 class Cycle:
     def __init__(self, step: int):
         self.step: int = step
-        self.cycle, self.mask = cycle_op.generate_cycle_matrix(self.step)
+        self.cycle, self.mask = cycle_op.generate_sym_cycle_matrix(self.step)
 
     @overload
     def __getitem__(self, index: int) -> int: ...
