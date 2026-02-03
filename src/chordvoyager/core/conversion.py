@@ -1,25 +1,25 @@
 import numpy as np
-from ..types import DT, Chroma, Degrees, ScaleChroma, ScaleDegrees
+from ..types import DT, ChromaArray, IntervalArray, ScaleChromaArray, ScaleIntervalArray
 from ..constants import DefaultMusicSystem as MS
 from . import validation as val
 
 
-def chroma_to_degree(v: Chroma) -> Degrees:
-    deg = np.flatnonzero(v).astype(DT.Deg)
-    return val.validate_degree(deg)
+def chroma_to_degree(v: ChromaArray) -> IntervalArray:
+    deg = np.flatnonzero(v).astype(DT.St)
+    return val.validate_interval_array(deg)
 
 
-def degree_to_chroma(v: Degrees) -> Chroma:
+def degree_to_chroma(v: IntervalArray) -> ChromaArray:
     chroma = np.zeros(MS.tones)
     chroma[v] = 1
     chroma = chroma.astype(DT.Chr)
-    return val.validate_chroma(chroma)
+    return val.validate_chroma_array(chroma)
 
 
-def chroma_to_scale_chroma(v: Chroma) -> ScaleChroma:
-    return val.validate_scale_chroma(v)
+def chroma_to_scale_chroma(v: ChromaArray) -> ScaleChromaArray:
+    return val.validate_scale_chroma_array(v)
 
 
-def scale_chroma_to_degree(v: ScaleChroma) -> ScaleDegrees:
+def scale_chroma_to_degree(v: ScaleChromaArray) -> ScaleIntervalArray:
     deg = chroma_to_degree(v)
-    return val.validate_scale_degree_vector(deg)
+    return val.validate_scale_interval_array(deg)

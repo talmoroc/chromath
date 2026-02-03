@@ -1,60 +1,81 @@
 import numpy as np
+from numpy.typing import ArrayLike, NDArray
+from typing import overload
 
-from ..types import DT, NDArray, Chroma, ScaleChroma, Degrees
+from ..types import DT, ChromaArray, ScaleChromaArray
 from ..constants import DefaultMusicSystem as MS
-from ..core.validation import validate_chroma
+from ..core.validation import validate_chroma_array
 from ..core.conversion import chroma_to_degree
-
 
 # GENERATION
 
 
-def from_vector(v: NDArray) -> Chroma:
-    return validate_chroma(v)
+def from_vector(v: ArrayLike) -> ChromaArray:
+    v = np.array(v, dtype=DT.Chr)
+    return validate_chroma_array(v)
 
 
-def from_index(v: NDArray) -> Chroma:
-    chroma = np.zeros(MS.tones)
+def from_index(v: ArrayLike) -> ChromaArray:
+    v = np.array(v)
+    chroma = np.zeros(MS.tones, dtype=DT.Chr)
     chroma[v] = 1
-    return validate_chroma(v)
+    return validate_chroma_array(chroma)
 
 
-def from_int(bitwise_repr: int) -> Chroma:
-    if bitwise_repr >= MS.max_int_repr:
-        raise ValueError(
-            f"Bitwise representation must be less than {MS.max_int_repr}, got {bitwise_repr}"
-        )
-    vector = np.array([(bitwise_repr >> i) & 1 for i in range(MS.tones)])
-    return validate_chroma(vector)
+def to_bits(v: ChromaArray) -> NDArray[np.uint8]:
+    return np.packbits(v)
+
+
+def from_bits(v: NDArray[np.uint8]) -> ChromaArray:
+    return validate_chroma_array(np.unpackbits(v, count=12).astype(DT.Chr))
 
 
 # CORE VECTOR FUNCTIONS
 
 
-def to_int(v: Chroma) -> int:
-    return int(np.dot(v, MS.powers))
+@overload
+def invert(s: ScaleChromaArray, pivot: int = 0) -> ScaleChromaArray: ...
 
 
-def invert(v, pivot: int = 0) -> Chroma:
+@overload
+def invert(c: ChromaArray, pivot: int = 0) -> ChromaArray: ...
+
+
+def invert(c: ChromaArray, pivot: int = 0) -> ChromaArray:
     """Musical inversion around a pivot (default 0)"""
     new_mask = np.zeros(MS.tones)
-    indices = (pivot - chroma_to_degree(v)) % MS.tones
+    indices = (pivot - chroma_to_degree(c)) % MS.tones
     new_mask[indices] = 1
     return new_mask.astype(DT.Chr)
 
-# def generate_scale_chroma_matrix(s: ScaleChroma) -> ScaleChromaMatrix:
-    
+
+# TODO: inversion for degrees ?
+
+
+def tonalities_matrix(s: ScaleChromaArray) -> ScaleChromaArray:
+    all_tonalities = np.array([np.roll(s, -i) for i in range(MS.tones)], dtype=DT.Chr)
+    return all_tonalities
 
 
 # UTILITIES
 
 
-def isin(v: Chroma, e: Chroma) -> bool:
-    return np.sum(v) == np.sum(v * e)  # TODO
+def isin(c: ChromaArray, container: ChromaArray) -> NDArray[DT.Chr]:
+    return np.all(container & c == c, axis=container.ndim - 1)
 
 
-# TODO: check if this works depending on dimensions
-# TODO: check if this works for a matrix product
+def common_tones(c: ChromaArray, with_: ChromaArray) -> NDArray[DT.St]:
+    return np.sum(with_ & c, axis=with_.ndim - 1, dtype=DT.St)
 
 
-###### TODO: Scales and operations on scales
+def dist(c: ChromaArray, with_: ChromaArray) -> NDArray:
+    ct = common_tones(c, with_)
+    return ct / ct.max()
+
+
+def closest(c: ChromaArray, with_: ChromaArray, n: int = 1) -> NDArray[DT.St]:
+    closest = np.argsort(-common_tones(c, with_), stable=True).astype(DT.St)
+    return closest[:n]
+
+
+# Full matrices

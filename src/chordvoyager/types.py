@@ -1,49 +1,30 @@
 import numpy as np
-from numpy.typing import NDArray
-
-
 from typing import Annotated, Final
+from numpy.typing import NDArray
 
 
 ## np.dtypes used to limit memory usage and accelerate int operations
 ## (modulo, integer division, bitwise operations)
 ## Maybe use only int8 everywhere ?
 class DT:
-    Chr: Final = np.bool_
-    Deg: Final = np.int8
-    Cycle: Final = np.int8
-
-
-## Generic Types
-type Vec[T: np.generic] = np.ndarray[tuple[int], np.dtype[T]]
-type Mat[T: np.generic] = np.ndarray[tuple[int, int], np.dtype[T]]
-type Cube[T: np.generic] = np.ndarray[tuple[int, int, int], np.dtype[T]]
-
-
-type NDArrayBool = NDArray[np.bool_]
-type NDArrayInt8 = NDArray[np.int8]
-type NDArrayInt64 = NDArray[np.int64]
+    Chr: Final = np.bool_  # Chroma
+    St: Final = np.int8  # Semitones or rank
 
 
 ## Chroma Types
-type Chroma = Annotated[Vec[DT.Chr], "(Tones,) bool mask"]
-type ScaleChroma = Annotated[Chroma, "(Tones,) bool mask with a fixed number of True values"]
-type ChromaMatrix = Annotated[Mat[DT.Chr], "Square matrix of chroma"]
-type ScaleChromaMatrix = Annotated[ChromaMatrix, "Square matrix of ScaleChroma"]
+
+type ChromaArray = Annotated[NDArray[DT.Chr], "Shape: (..., MS.tones)"]
+type ScaleChromaArray = Annotated[ChromaArray, "Shape: (..., MS.tones) with MS.degrees ones"]
 
 ## Degree Types
-type Degrees = Annotated[Vec[DT.Deg], "(N,) degree->tone map"]
-type ScaleDegrees = Annotated[Degrees, "(Degrees,) degree -> tone map"]
-type Interval = Annotated[Mat[DT.Deg], ""]
-
+type IntervalArray = Annotated[NDArray[DT.St], "Shape: (..., 2) (degree, tone) representation"]
+type ScaleIntervalArray = Annotated[IntervalArray, "Shape: (..., MS.degrees, 2)"]
 
 ## Cycle Types
-type CycleVec = Annotated[Vec[DT.Cycle], "(Tones,) tone->cycle_rank map (-1 if tone not in cycle)"]
-type RankVec = Annotated[Vec[DT.Cycle], "(Periodicity,) cycle_rank->tone map"]
-type CycleMatrix = Annotated[Mat[DT.Cycle], "Matrix of CycleVecs: (starting_tone, tone) -> rank"]
-type RankMatrix = Annotated[Mat[DT.Cycle], "Matrix of RankVecs: (starting_tone, rank) -> tone"]
+type CycleArray = Annotated[NDArray[DT.St], "Shape: (..., MS.tones) tone -> cycle_rank map"]
+type RankArray = Annotated[
+    NDArray[DT.St], "Shape: (..., <= cycle periodicity) cycle_rank -> tone map"
+]
 
-type SymCycleVec = Annotated[Mat[DT.Cycle], "(dir, tone)->cycle_rank"]
-type SymRankVec = Annotated[Mat[DT.Cycle], "(dir, cycle_rank)->tone"]
-type SymCycleMatrix = Annotated[Cube[DT.Cycle], "(direction, starting_tone, tone) -> rank"]
-type SymRankMatrix = Annotated[Cube[DT.Cycle], "(direction, starting_tone, rank) -> tone"]
+type SymCycleArray = Annotated[NDArray[DT.St], "Shape: (..., tone, 2) with dim for cycle direction"]
+type SymRankArray = Annotated[NDArray[DT.St], "Shape: (..., 2, rank) with dim for cycle direction"]

@@ -2,17 +2,17 @@ from enum import Enum
 from dataclasses import dataclass
 import numpy as np
 
-IONIAN_SEMITONES: list[int] = [0, 2, 4, 5, 7, 9, 11]
+IONIAN_SEMITONES = np.array([0, 2, 4, 5, 7, 9, 11])
 
 
 @dataclass(frozen=True)
 class DefaultMusicSystem:
     tones: int = 12
-    tones_set = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
+    tones_set: set[int] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
     degrees: int = 7
-    degrees_set = {0, 1, 2, 3, 4, 5, 6, 7}
+    degrees_set: set[int] = {0, 1, 2, 3, 4, 5, 6, 7}
     func_degrees: int = 13  # degrees meaningful for intervals
-    func_degrees_set = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
+    func_degrees_set: set[int] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
     # bitwise representation of tones
     powers: tuple[int] = tuple(2**i for i in range(12))
     # max bitwise representation

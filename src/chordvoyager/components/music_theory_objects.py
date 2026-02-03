@@ -3,8 +3,8 @@ from __future__ import annotations
 from functools import cached_property
 from dataclasses import dataclass
 from typing import overload, cast
-from numpy.typing import ArrayLike
-from ..types import Chroma, Degrees, CycleVec, DT, NDArrayInt8
+from numpy.typing import ArrayLike, NDArray
+from ..types import ChromaArray, IntervalArray, CycleArray, DT
 
 import numpy as np
 
@@ -22,27 +22,27 @@ from ..constants import (
 
 class Tone:
     def shift(t: int, n: int) -> int:
-        return deg_op.shift(cast("Degrees", t), n)[0]
+        return deg_op.shift(cast("IntervalArray", t), n)[0]
 
-    def to_chroma(t: int) -> Chroma:
-        return Chroma(core_conv.degree_to_chroma(np.array(t)))
+    def to_chroma(t: int) -> ChromaObject:
+        return ChromaObject(core_conv.degree_to_chroma(np.array(t)))
 
-    def isin(t: int, chroma: Chroma) -> bool:
+    def isin(t: int, chroma: ChromaObject) -> bool:
         return chroma.vector[t] == 1
 
 
-class Chroma:
+class ChromaObject:
     def __init__(self, data: ArrayLike):
-        arr: Chroma = val.validate_chroma(np.array(data, copy=True).ravel())  # Conversion
+        arr = chr_op.from_vector(data)  # Conversion
         arr.flags.writeable = False  # Immutability
-        self.vector: Chroma = arr
-        self.degrees: Degrees = chr_op.chroma_to_degree(self.vector)
+        self.vector: ChromaArray= arr
+        self.degrees: IntervalArray = chr_op.chroma_to_degree(self.vector)
 
-    def shift(self, n: int) -> Chroma:
-        return Chroma(np.roll(self.vector, n))
+    def shift(self, n: int) -> ChromaObject:
+        return ChromaObject(np.roll(self.vector, n))
 
-    def invert(self, pivot: int = 0) -> Chroma:
-        return Chroma(chr_op.invert(self.vector, pivot))
+    def invert(self, pivot: int = 0) -> ChromaObject:
+        return ChromaObject(chr_op.invert(self.vector, pivot))
 
 
 class Cycle:
@@ -53,9 +53,9 @@ class Cycle:
     @overload
     def __getitem__(self, index: int) -> int: ...
     @overload
-    def __getitem__(self, index: slice) -> NDArrayInt8: ...
+    def __getitem__(self, index: slice) -> NDArray: ...
 
-    def __getitem__(self, index: int | slice) -> int | NDArrayInt8:  # order -> semitone
+    def __getitem__(self, index: int | slice) -> int | NDArray:  # order -> semitone
         if isinstance(index, int):
             return (self.step * index) % MS.tones
         start = 0 if index.start is None else index.start
@@ -64,7 +64,7 @@ class Cycle:
         stop = start + MS.tones if index.stop is None else index.stop - MS.tones * dividend
         step = 1 if index.step is None else index.step % MS.tones
         if not self.is_complete:
-            return np.array([self[i] for i in range(start, stop, step)], dtype=DT.Cycle)
+            return np.array([self[i] for i in range(start, stop, step)], dtype=DT.St)
         indices = np.arange(start, stop, step) * self.step % MS.tones
         return self.rank_matrix.view()[0, indices]
 
@@ -77,19 +77,19 @@ class Cycle:
         return cycle_op.is_complete(self.step)
 
     @property
-    def chroma(self) -> Chroma:
-        return Chroma(val.validate_chroma(self.mask))
+    def chroma(self) -> ChromaObject:
+        return ChromaObject(val.validate_chroma_array(self.mask))
 
     @property
-    def cycle_matrix(self) -> CycleVec:
+    def cycle_matrix(self) -> CycleArray:
         return self.cycle
 
     @cached_property
-    def rank_matrix(self) -> NDArrayInt8:
+    def rank_matrix(self) -> NDArray:
         idx = np.arange(MS.tones)
         cycle_semitones = np.arange(0, self.step * self.periodicity, self.step) % MS.tones
-        mask = np.zeros(MS.tones, dtype=DT.Cycle)
-        cycle_asc = np.zeros(MS.tones, dtype=DT.Cycle)
+        mask = np.zeros(MS.tones, dtype=DT.St)
+        cycle_asc = np.zeros(MS.tones, dtype=DT.St)
         mask[cycle_semitones] = 1
         cycle_asc[cycle_semitones] = np.arange(self.periodicity)
         cycle_desc = (self.periodicity - cycle_asc) % self.periodicity
@@ -101,11 +101,11 @@ class Cycle:
         )
 
     @cached_property  # Access : pitch_to_rank[1|2, pitch] 1 = ascending, 2 = descending
-    def pitch_to_rank(self) -> NDArrayInt8:
+    def pitch_to_rank(self) -> NDArray:
         return self.rank_matrix.view()[2:4,]
 
     @cached_property  # Access : rank_to_pitch[1|2, rank] 1 = ascending, 2 = descending
-    def rank_to_pitch(self) -> NDArrayInt8:
+    def rank_to_pitch(self) -> NDArray:
         if not self.is_complete:  # We repeat the matrix to get a MS.tones dimension
             ascending_rank = [self[i] for i in range(MS.tones)]
             descending_rank = [self[-i] for i in range(MS.tones)]
@@ -125,7 +125,7 @@ class Cycles:
 
 @dataclass(frozen=True)
 class Scale:
-    degree_semitones: list[int]
+    degree_semitones: list[int] | NDArray
 
     def __post_init__(self):
         if len(self.degree_semitones) != MS.degrees:
@@ -167,8 +167,8 @@ class Scale:
         return mask.tolist()
 
     @cached_property
-    def chroma(self) -> Chroma:
-        return Chroma(self.mask)
+    def chroma(self) -> ChromaObject:
+        return ChromaObject(self.mask)
 
     def shift(self, start_degree: int) -> Scale:
         new_semitones = np.roll(self.degree_semitones, start_degree % MS.degrees)
@@ -432,7 +432,7 @@ class Note:
         return cls(pitch.sounding_pitch + (octave + 1) * 12)
 
     @cached_property
-    def chroma(self) -> Chroma:
+    def chroma(self) -> ChromaObject:
         return Tone.to_chroma(self.note_index)
 
 
