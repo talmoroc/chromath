@@ -263,7 +263,7 @@ wheels = [
 ]
 
 [[package]]
-name = "chordvoyager"
+name = "chromath"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [

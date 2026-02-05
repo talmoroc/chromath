@@ -4,7 +4,7 @@ This is a complex matter as composers themselves sometimes struggle with it.
 For now, we have simplified functions that do not depend on context.
 """
 
-from src.chordvoyager.constants import Letter
+from ..constants import Letter
 
 SHARP_NAMES = {
     0: "C",
