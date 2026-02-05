@@ -1,7 +1,7 @@
 [project]
 name = "chromath"
 version = "0.0.1"
-description = "Chord Analysis and Generation Library"
+description = "Music objects analyzer (chords, intervals, scales, tonalities) built on numpy."
 readme = "README.md"
 authors = [
     { name = "monotom", email = "tom.coral@outlook.com" }
