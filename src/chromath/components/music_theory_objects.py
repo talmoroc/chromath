@@ -4,23 +4,24 @@ from functools import cached_property
 from dataclasses import dataclass
 
 
-import src.chordvoyager.core.freq_ops as freq_op
-import src.chordvoyager.core.degree_ops as deg_op
-import src.chordvoyager.core.chroma_ops as chr_op
-import src.chordvoyager.core.conversion as core_conv
-import src.chordvoyager.core.validation as val
+from ..core import freq_ops as freq_op
+from ..core import degree_ops as deg_op
+from ..core import chroma_ops as chr_op
+from ..core import conversion as core_conv
+from ..core import validation as val
+from ..core import cycle_ops as cycle_op
+
 from typing import overload, cast
 from numpy.typing import ArrayLike
 
 import numpy as np
 
-from src.chordvoyager.constants import (
+from ..constants import (
     DefaultMusicSystem as MS,
     IONIAN_SEMITONES,
 )
-from src.chordvoyager.types import ChromaVec, DegreeVec, CycleMatrix, DTYPE, NDArrayInt8
+from ..types import ChromaVec, DegreeVec, CycleMatrix, DTYPE, NDArrayInt8
 
-import src.chordvoyager.core.cycle_ops as cycle_op
 
 
 class Tone:

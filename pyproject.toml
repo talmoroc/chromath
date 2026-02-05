@@ -1,5 +1,5 @@
 [project]
-name = "chordvoyager"
+name = "chromath"
 version = "0.0.1"
 description = "Chord Analysis and Generation Library"
 readme = "README.md"

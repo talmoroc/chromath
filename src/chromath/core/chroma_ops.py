@@ -1,13 +1,13 @@
 import numpy as np
 
-from src.chordvoyager.types import (
+from ..types import (
     NDArrayBool,
     NDArrayInt8,
     ChromaVec,
 )
-from src.chordvoyager.constants import DefaultMusicSystem as MS
-from src.chordvoyager.core.validation import validate_chroma
-from src.chordvoyager.core.conversion import chroma_to_degree
+from ..constants import DefaultMusicSystem as MS
+from .validation import validate_chroma
+from .conversion import chroma_to_degree
 
 
 def generate(v: NDArrayBool | NDArrayInt8 | int) -> ChromaVec:

@@ -1,7 +1,7 @@
 import numpy as np
-from src.chordvoyager.types import ChromaVec, DegreeVec, ScaleChromaVec
-from src.chordvoyager.constants import DefaultMusicSystem as MS
-import src.chordvoyager.core.validation as val
+from ..types import ChromaVec, DegreeVec, ScaleChromaVec
+from ..constants import DefaultMusicSystem as MS
+from . import validation as val
 
 
 def chroma_to_degree(v: ChromaVec) -> DegreeVec:
