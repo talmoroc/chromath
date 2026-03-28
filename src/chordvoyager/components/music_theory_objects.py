@@ -9,7 +9,7 @@ from ..types import ChromaArray, IntervalArray, CycleArray, DT
 import numpy as np
 
 from ..core import freq_ops as freq_op
-from ..core import degree_ops as deg_op
+from ..core import interval_ops as int_op
 from ..core import chroma_ops as chr_op
 from ..core import conversion as core_conv
 from ..core import validation as val
@@ -22,7 +22,7 @@ from ..constants import (
 
 class Tone:
     def shift(t: int, n: int) -> int:
-        return deg_op.shift(cast("IntervalArray", t), n)[0]
+        return int_op.shift(cast("IntervalArray", t), n)[0]
 
     def to_chroma(t: int) -> ChromaObject:
         return ChromaObject(core_conv.degree_to_chroma(np.array(t)))
@@ -36,7 +36,7 @@ class ChromaObject:
         arr = chr_op.from_vector(data)  # Conversion
         arr.flags.writeable = False  # Immutability
         self.vector: ChromaArray= arr
-        self.degrees: IntervalArray = chr_op.chroma_to_degree(self.vector)
+        self.degrees: IntervalArray = core_conv.chroma_to_degree(self.vector)
 
     def shift(self, n: int) -> ChromaObject:
         return ChromaObject(np.roll(self.vector, n))
@@ -48,7 +48,8 @@ class ChromaObject:
 class Cycle:
     def __init__(self, step: int):
         self.step: int = step
-        self.cycle, self.mask = cycle_op.generate_sym_cycle_matrix(self.step)
+        self.cycle = cycle_op.generate_sym_cycle_matrix(self.step)
+        self.mask = np.where(self.cycle == -1)
 
     @overload
     def __getitem__(self, index: int) -> int: ...
