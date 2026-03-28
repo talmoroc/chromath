@@ -5,7 +5,7 @@ from typing import overload
 from ..types import DT, ChromaArray, ScaleChromaArray
 from ..constants import DefaultMusicSystem as MS
 from ..core.validation import validate_chroma_array
-from ..core.conversion import chroma_to_degree
+from ..core.conversion import chroma_to_semitones
 
 # GENERATION
 
@@ -44,7 +44,7 @@ def invert(c: ChromaArray, pivot: int = 0) -> ChromaArray: ...
 def invert(c: ChromaArray, pivot: int = 0) -> ChromaArray:
     """Musical inversion around a pivot (default 0)"""
     new_mask = np.zeros(MS.tones)
-    indices = (pivot - chroma_to_degree(c)) % MS.tones
+    indices = (pivot - chroma_to_semitones(c)) % MS.tones
     new_mask[indices] = 1
     return new_mask.astype(DT.Chr)
 
@@ -53,29 +53,36 @@ def invert(c: ChromaArray, pivot: int = 0) -> ChromaArray:
 
 
 def tonalities_matrix(s: ScaleChromaArray) -> ScaleChromaArray:
-    all_tonalities = np.array([np.roll(s, -i) for i in range(MS.tones)], dtype=DT.Chr)
-    return all_tonalities
+    idx = np.arange(MS.tones)
+    shifted_index = (idx - idx[:, np.newaxis]) % 12
+    return s[shifted_index]
 
 
 # UTILITIES
 
 
 def isin(c: ChromaArray, container: ChromaArray) -> NDArray[DT.Chr]:
-    return np.all(container & c == c, axis=container.ndim - 1)
+    if c.ndim > 1 and container.ndim > 1:
+        c = c[..., np.newaxis, :]
+    return np.all(container & c == c, axis=-1)
 
 
-def common_tones(c: ChromaArray, with_: ChromaArray) -> NDArray[DT.St]:
-    return np.sum(with_ & c, axis=with_.ndim - 1, dtype=DT.St)
+def common_tones(c1: ChromaArray, c2: ChromaArray) -> NDArray[DT.St]:
+    if c1.ndim > 1 and c2.ndim > 1:
+        c1 = c1[..., np.newaxis, :]
+    return np.sum(c2 & c1, axis=-1, dtype=DT.St)
 
 
-def dist(c: ChromaArray, with_: ChromaArray) -> NDArray:
-    ct = common_tones(c, with_)
-    return ct / ct.max()
+def dist(c1: ChromaArray, c2: ChromaArray) -> NDArray:
+    ct = common_tones(c1, c2)
+    return (ct.max() - ct) / ct.max() # TODO: improve to include min(1s in c1, 1s in c2)
 
 
-def closest(c: ChromaArray, with_: ChromaArray, n: int = 1) -> NDArray[DT.St]:
-    closest = np.argsort(-common_tones(c, with_), stable=True).astype(DT.St)
-    return closest[:n]
+def closest(c: ChromaArray, container: ChromaArray, n: int = 1) -> NDArray[DT.St]:
+    if c.ndim > 1 and container.ndim > 1:
+        c = c[..., np.newaxis, :]
+    closest = np.argsort(-common_tones(c, container), stable=True, axis=-1).astype(DT.St)
+    return closest[:, :n]
 
 
 # Full matrices

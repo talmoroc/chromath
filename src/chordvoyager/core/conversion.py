@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.typing import NDArray
 from ..types import DT, ChromaArray, IntervalArray, ScaleChromaArray, ScaleIntervalArray
 from ..constants import DefaultMusicSystem as MS
 from . import validation as val
@@ -7,6 +8,10 @@ from . import validation as val
 def chroma_to_degree(v: ChromaArray) -> IntervalArray:
     deg = np.flatnonzero(v).astype(DT.St)
     return val.validate_interval_array(deg)
+
+
+def chroma_to_semitones(v: ChromaArray) -> NDArray[DT.St]:
+    return np.flatnonzero(v).astype(DT.St)
 
 
 def degree_to_chroma(v: IntervalArray) -> ChromaArray:
