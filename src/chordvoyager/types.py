@@ -3,24 +3,24 @@ from typing import Annotated, Final
 from numpy.typing import NDArray
 
 
-## np.dtypes used to limit memory usage and accelerate int operations
-## (modulo, integer division, bitwise operations)
-## Maybe use only int8 everywhere ?
+# NOTE: np.dtypes used to limit memory usage (bool + int8)
+# If it vectorization becomes a bottleneck, use int32/int64 everywhere
+
 class DT:
     Chr: Final = np.bool_  # Chroma
     St: Final = np.int8  # Semitones or rank
 
 
-## Chroma Types
+# Chroma Types
 
 type ChromaArray = Annotated[NDArray[DT.Chr], "Shape: (..., MS.tones)"]
 type ScaleChromaArray = Annotated[ChromaArray, "Shape: (..., MS.tones) with MS.degrees ones"]
 
-## Degree Types
+# Degree Types
 type IntervalArray = Annotated[NDArray[DT.St], "Shape: (..., 2) (degree, tone) representation"]
 type ScaleIntervalArray = Annotated[IntervalArray, "Shape: (..., MS.degrees, 2)"]
 
-## Cycle Types
+# Cycle Types
 type CycleArray = Annotated[NDArray[DT.St], "Shape: (..., MS.tones) tone -> cycle_rank map"]
 type RankArray = Annotated[
     NDArray[DT.St], "Shape: (..., <= cycle periodicity) cycle_rank -> tone map"
