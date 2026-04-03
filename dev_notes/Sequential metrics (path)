@@ -1,0 +1,105 @@
+## Physical models guiding the chord progressions
+A model for the path of chord progression allows to compute variables over time, with retroaction
+- the model gives a prediction of value, can be used over windows of different size, so it can be used for dynamic generation
+- it needs to be combined with heuristics (structural patterns such as cycle of fifth exploration or scale degrees, or random) that destabilize the equilibrium
+- the meta-parameters are
+    - the parameters of the physical model according to some dimensions
+    - as well as the parameters of the heuristics
+
+### Spring
+[text](https://fr.wikipedia.org/wiki/Syst%C3%A8me_masse-ressort)
+- One-dimensional stable point
+- Force applied -> callback force
+- Oscillation around a stable point
+
+Examples :
+0 -> 1 -> 0 = crashing on the lower limit
+0 -> 1 -> -1 -> 0 = no lower limit
+0 -> 2 -> 1 -> 0 = crashing on the lower limit
+0 -> 2 -> 0 = strong callback force
+=> The spring does not seem a good approximation for the chord progression when there is a lower limit.
+=> There is 
+
+- Asymmetrical ? (problem if the measure has symmetrical forces)
+- Torsion spring ?
+
+### Gravity, stability
+[text](https://fr.wikipedia.org/wiki/%C3%89quation_d%27orbite)
+- Orbit : rotation around a center
+- Disturbances -> less stable -> can change (tonal?) center
+- Unstable orbit -> getting farther away or spiral
+- Crashing movement
+
+### Pendulum
+[text](https://fr.wikipedia.org/wiki/Pendule_simple)
+- Constant oscillation => moving equilibrium
+- Force accumulates by itself with oscillations, from first impulsion
+- First impulsion can be stronger, then it will fall to the equilibrium
+
+
+| I need systems that apply forces, and systems that resolve forces.
+| These systems combine themselves sequentially.
+| The forces are applied and resolved relative to different windows of context
+| Example : up the scale -> IV -> V -> I
+| Example : up the scale -> IV -> further away bVII -> IV -> I
+| Example : up the scale -> III -> V/III -> III -> up the scale -> V -> I
+
+
+
+## Time series
+- Take a metric over a chord progression
+- Model it as a time series (ARMA for instance)
+- Predict the next, originality = probability
+- The meta parameters are the parameters of the model as well as the fitness of the chord progression to the model
+
+## Simple statistics
+- Have constraints on start and ending chord
+- Compute the mean, std, skewness etc of
+- the chord progressions are ranked according to these statistics
+- the meta-parameters influence the weight of the statistics => re-ranking
+
+
+
+
+
+
+
+
+
+# Exploration of examples
+### Cycle of V
+#### Continuity
+0 -> 1 -> 2 -> 3 ...
+
+#### Jump
+0 -> 3
+
+#### Resolution by continuity : shortest path
+0 -> 2 -> 1 -> 0 (V/V cadenza or Jazz cadenza depending on 2/1 or 2/0)
+
+| Note : if 2 = 2/0, we have 2 close to -1 so double mouvement opposite + continuity
+
+
+#### Resolution by jump
+0 -> 3 -> 0
+
+#### Resolution by opposite (Spring effect)
+0 -> -1 -> 1 -> 0 (Perfect classical cadenza)
+0 -> 2/1 -> -1 -> 1 -> 0 (Standard effect)
+Could have also 0 -> 2/1 -> -1 -> 0
+
+#### 
+
+
+
+
+[
+    [0,2,4],
+    [0,4,7]
+]
+
+[
+    [0,1,2,3,4,5,6],
+    [0,2,4,5,7,9,11]
+]
+
