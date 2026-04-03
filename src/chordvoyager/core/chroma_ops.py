@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-from typing import overload
+from typing import overload, Literal
 
 from ..types import DT, ChromaArray, ScaleChromaArray
 from ..constants import DefaultMusicSystem as MS
@@ -49,9 +49,6 @@ def invert(c: ChromaArray, pivot: int = 0) -> ChromaArray:
     return new_mask.astype(DT.Chr)
 
 
-# TODO: inversion for degrees ?
-
-
 def tonalities_matrix(s: ScaleChromaArray) -> ScaleChromaArray:
     idx = np.arange(MS.tones)
     shifted_index = (idx - idx[:, np.newaxis]) % 12
@@ -73,16 +70,30 @@ def common_tones(c1: ChromaArray, c2: ChromaArray) -> NDArray[DT.St]:
     return np.sum(c2 & c1, axis=-1, dtype=DT.St)
 
 
-def dist(c1: ChromaArray, c2: ChromaArray) -> NDArray:
+# Hamming distance : good for comparing similar objects. Difference in tones relative to the 12 tones
+def hamming_dist(c1: ChromaArray, c2: ChromaArray) -> NDArray:
+    """ Measures how many tones are different between two chromas. Relative to the total number of tones in the music system."""
     ct = common_tones(c1, c2)
-    return (ct.max() - ct) / ct.max() # TODO: improve to include min(1s in c1, 1s in c2)
+    return (c1.sum(axis=-1) + c2.sum(axis=-1) - 2 * ct) / MS.tones
 
 
-def closest(c: ChromaArray, container: ChromaArray, n: int = 1) -> NDArray[DT.St]:
-    if c.ndim > 1 and container.ndim > 1:
-        c = c[..., np.newaxis, :]
-    closest = np.argsort(-common_tones(c, container), stable=True, axis=-1).astype(DT.St)
-    return closest[:, :n]
+# Jaccard distance : good for comparing similar objects. Difference in tones within the space of c1 union c2
+def jaccard_dist(c1: ChromaArray, c2: ChromaArray) -> NDArray:
+    """ Measures how many tones are shared between two chromas. Relative to the total number of tones present in either chroma."""
+    ct = common_tones(c1, c2)
+    return 1 - ct / (c1.sum(axis=-1) + c2.sum(axis=-1) - ct)
 
 
-# Full matrices
+# Assymetric Tversky : inclusion of an object within another one
+def tversky_dist(from_: ChromaArray, to_: ChromaArray) -> NDArray:
+    """ Measures how much 'from_' is included in 'to_'. """
+    ct = common_tones(from_, to_)
+    return 1 - ct / from_.sum(axis=-1)[..., np.newaxis]
+
+
+def closest(from_: ChromaArray, to_: ChromaArray, n: int = 1, dist: Literal['hamming', 'jaccard', 'tversky'] = 'tversky') -> NDArray[DT.St]:
+    """ Returns the indices of the closest chromas in 'to_' for each chroma in 'from_' based on the specified distance metric. """
+    if from_.ndim > 1 and to_.ndim > 1:
+        from_ = from_[..., np.newaxis, :]
+    closest = np.argsort(-common_tones(from_, to_), stable=True, axis=-1).astype(DT.St)
+    return closest[..., :n]
