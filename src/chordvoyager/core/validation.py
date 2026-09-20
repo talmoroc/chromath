@@ -7,6 +7,9 @@ from ..types import (
     ScaleChromaArray,
     IntervalArray,
     ScaleIntervalArray,
+    InterpretedIntervalArray,
+    ScaleLookupArray,
+    ScaleLookupCounts,
     CycleArray,
     SymCycleArray,
     SymRankArray,
@@ -69,3 +72,18 @@ def validate_interval_array(arr: ArrayLike) -> IntervalArray:
 
 def validate_scale_interval_array(arr: ArrayLike) -> ScaleIntervalArray:
     return validate_array(arr, (MS.degrees, 2), DT.St, "IntervalArray")
+
+
+# Interpreted Interval Validations
+
+
+def validate_interpreted_interval_array(arr: ArrayLike) -> InterpretedIntervalArray:
+    return validate_array(arr, (3,), DT.St, "InterpretedIntervalArray")
+
+
+def validate_scale_lookup(arr: ArrayLike) -> ScaleLookupArray:
+    return validate_array(arr, (MS.tones, 2, 2), DT.St, "ScaleLookupArray")
+
+
+def validate_scale_lookup_counts(arr: ArrayLike) -> ScaleLookupCounts:
+    return validate_array(arr, (MS.tones,), DT.St, "ScaleLookupCounts")
