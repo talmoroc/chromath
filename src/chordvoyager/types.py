@@ -20,6 +20,19 @@ type ScaleChromaArray = Annotated[ChromaArray, "Shape: (..., MS.tones) with MS.d
 type IntervalArray = Annotated[NDArray[DT.St], "Shape: (..., 2) (degree, tone) representation"]
 type ScaleIntervalArray = Annotated[IntervalArray, "Shape: (..., MS.degrees, 2)"]
 
+# Interpreted Interval Types (degree + semitone + alteration)
+type InterpretedIntervalArray = Annotated[
+    NDArray[DT.St], "Shape: (..., 3) (degree_0idx, semitone, alteration) per note"
+]
+
+# Scale Lookup Types (maps each semitone to possible degree/alteration pairs)
+type ScaleLookupArray = Annotated[
+    NDArray[DT.St], "Shape: (..., 12, 2, 2) [semitone, interp_idx, (degree, alteration)]"
+]
+type ScaleLookupCounts = Annotated[
+    NDArray[DT.St], "Shape: (..., 12) number of valid interpretations per semitone"
+]
+
 # Cycle Types
 type CycleArray = Annotated[NDArray[DT.St], "Shape: (..., MS.tones) tone -> cycle_rank map"]
 type RankArray = Annotated[
