@@ -1,5 +1,6 @@
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
+
 import numpy as np
 
 IONIAN_SEMITONES = np.array([0, 2, 4, 5, 7, 9, 11])

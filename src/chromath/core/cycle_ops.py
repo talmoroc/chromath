@@ -1,12 +1,9 @@
+import math
+
 import numpy as np
 from numpy.typing import NDArray
-import math
-from .validation import (
-    validate_chroma_array,
-    validate_cycle_array,
-    validate_sym_rank_array,
-)
 
+from ..constants import DefaultMusicSystem as MS
 from ..types import (
     DT,
     ChromaArray,
@@ -15,8 +12,11 @@ from ..types import (
     SymCycleArray,
     SymRankArray,
 )
-
-from ..constants import DefaultMusicSystem as MS
+from .validation import (
+    validate_chroma_array,
+    validate_cycle_array,
+    validate_sym_rank_array,
+)
 
 
 def periodicity(step: int) -> int:

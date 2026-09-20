@@ -1,12 +1,21 @@
 from __future__ import annotations
 
-import numpy as np
+from collections.abc import Callable
 from itertools import product as cartesian_product
-from typing import Callable
 
-from ..types import DT, IntervalArray, ScaleIntervalArray, InterpretedIntervalArray, ScaleLookupArray, ScaleLookupCounts
+import numpy as np
+
 from ..constants import DefaultMusicSystem as MS
+from ..types import (
+    DT,
+    InterpretedIntervalArray,
+    IntervalArray,
+    ScaleIntervalArray,
+    ScaleLookupArray,
+    ScaleLookupCounts,
+)
 from . import validation as val
+
 
 def to_int(v: IntervalArray) -> int:
     """
@@ -16,6 +25,7 @@ def to_int(v: IntervalArray) -> int:
     chroma = np.zeros(MS.tones, dtype=int)
     chroma[semitones % MS.tones] = 1
     return int(np.dot(chroma, MS.powers))
+
 
 def from_bits(bitwise_repr: int) -> IntervalArray:
     """
@@ -84,8 +94,7 @@ def semitone_distance(interval1: IntervalArray, interval2: IntervalArray) -> int
     return int(np.abs(st2 - st1) % MS.tones)
 
 
-def scale_distance(scale1_semitones: list[int] | np.ndarray,
-                   scale2_semitones: list[int] | np.ndarray) -> int:
+def scale_distance(scale1_semitones: list[int] | np.ndarray, scale2_semitones: list[int] | np.ndarray) -> int:
     """
     Computes the total semitone distance between two scales.
     Returns the sum of absolute differences for each degree.
@@ -230,7 +239,7 @@ def _interpret_single_lookup(
 
     deg_alt = lookup[safe_st, 0]
 
-    result = np.full(original_shape + (3,), _SENTINEL, dtype=DT.St)
+    result = np.full((*original_shape, 3), _SENTINEL, dtype=DT.St)
     result[..., 0] = np.where(mask, deg_alt[..., 0], _SENTINEL)
     result[..., 1] = np.where(mask, st, _SENTINEL)
     result[..., 2] = np.where(mask, deg_alt[..., 1], _SENTINEL)
@@ -281,10 +290,7 @@ def interpret_canonical(
         distance_fn = _cof_distance
 
     # Normalise to list
-    if isinstance(reference_roots, (int, np.integer)):
-        ref_list = [int(reference_roots)]
-    else:
-        ref_list = [int(r) for r in reference_roots]
+    ref_list = [int(reference_roots)] if isinstance(reference_roots, (int, np.integer)) else [int(r) for r in reference_roots]
 
     st = np.asarray(chord_semitones, dtype=DT.St).ravel()
     n_notes = len(st)
@@ -299,8 +305,8 @@ def interpret_canonical(
     # in it (every note has alteration == 0).  The tonality's position on the
     # circle of fifths implies the conventional enharmonic spelling:
     #   CoF position = (root * 7) % 12
-    #   1–6  (G D A E B F#)  → sharp-side → votes for sharps
-    #   7–11 (Db Ab Eb Bb F) → flat-side  → votes for flats
+    #   1-6  (G D A E B F#)  → sharp-side → votes for sharps
+    #   7-11 (Db Ab Eb Bb F) → flat-side  → votes for flats
     #   0    (C)              → neutral, no vote
     # Weight = 1 / (1 + dist) where dist = min CoF distance to any reference root.
     # The chord-level vote decides the single enharmonic spelling applied to all
@@ -312,21 +318,18 @@ def interpret_canonical(
 
     # Original (root=0) lookup for degree extraction
     original_lookups, original_counts = all_lookups[0]
-    original_lk = original_lookups[0]   # (12, 2, 2)
-    original_ct = original_counts[0]    # (12,)
+    original_lk = original_lookups[0]  # (12, 2, 2)
+    original_ct = original_counts[0]  # (12,)
 
     valid_st = [int(s) for s in st if s >= 0]
 
     for lookups, counts in all_lookups:
         for root in range(MS.tones):
-            lk = lookups[root]   # (12, 2, 2)
-            ct = counts[root]    # (12,)
+            lk = lookups[root]  # (12, 2, 2)
+            ct = counts[root]  # (12,)
 
             # Check if the whole chord is diatonic in this transposition
-            chord_is_diatonic = all(
-                any(int(lk[s, k, 1]) == 0 for k in range(int(ct[s])))
-                for s in valid_st
-            )
+            chord_is_diatonic = all(any(int(lk[s, k, 1]) == 0 for k in range(int(ct[s]))) for s in valid_st)
             if not chord_is_diatonic:
                 continue
 
@@ -346,15 +349,12 @@ def interpret_canonical(
     # spellings in the original lookup (i.e. is chromatic / non-diatonic).
     has_chromatic = any(int(original_ct[s]) > 1 for s in valid_st)
     if has_chromatic and sharp_weight == flat_weight:
-        note_names_dbg = ["C","C#/Db","D","D#/Eb","E","F","F#/Gb","G","G#/Ab","A","A#/Bb","B"]
+        note_names_dbg = ["C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"]
         chord_str = " ".join(note_names_dbg[s] for s in valid_st)
         ref_str = " ".join(note_names_dbg[r] for r in ref_list)
-        print(
-            f"[interpret_canonical] AMBIGUOUS spelling for chord [{chord_str}] "
-            f"ref={ref_str}  sharp_w={sharp_weight:.3f} flat_w={flat_weight:.3f}"
-        )
+        print(f"[interpret_canonical] AMBIGUOUS spelling for chord [{chord_str}] ref={ref_str}  sharp_w={sharp_weight:.3f} flat_w={flat_weight:.3f}")
         for root, side, w in sorted(voting_keys, key=lambda x: -x[2]):
-            note_names_dbg2 = ["C","Db","D","Eb","E","F","F#","G","Ab","A","Bb","B"]
+            note_names_dbg2 = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"]
             print(f"  root={note_names_dbg2[root]:<3} side={side:<5} w={w:.3f}")
         # Default to flat on a tie (conventional)
 
@@ -381,11 +381,7 @@ def interpret_canonical(
             # Two interpretations: find (sharp, alt>0) and (flat, alt<0)
             for k in range(nc):
                 alt = int(original_lk[s, k, 1])
-                if use_sharp and alt > 0:
-                    chosen_deg = int(original_lk[s, k, 0])
-                    chosen_alt = alt
-                    break
-                elif not use_sharp and alt < 0:
+                if (use_sharp and alt > 0) or (not use_sharp and alt < 0):
                     chosen_deg = int(original_lk[s, k, 0])
                     chosen_alt = alt
                     break
@@ -394,7 +390,7 @@ def interpret_canonical(
                 chosen_deg = int(original_lk[s, 0, 0])
                 chosen_alt = int(original_lk[s, 0, 1])
 
-        result[ni] = (chosen_deg, s, chosen_alt)
+        result[ni] = (chosen_deg, s, int(chosen_alt) if chosen_alt is not None else 0)
 
     return result
 
@@ -430,7 +426,7 @@ def interpret_all(
     results: list[InterpretedIntervalArray] = []
     for combo in cartesian_product(*per_note_options):
         interp = np.full((len(st), 3), _SENTINEL, dtype=DT.St)
-        for i, (idx, s) in enumerate(zip(np.where(valid)[0], active_st)):
+        for i, (idx, s) in enumerate(zip(np.where(valid)[0], active_st, strict=True)):
             deg, alt = combo[i]
             interp[idx] = (deg, s, alt)
         results.append(interp)

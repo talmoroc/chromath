@@ -7,9 +7,7 @@ def midi_freq(midi_value: int) -> float:
 
 
 # https://arxiv.org/pdf/1306.6458#subsection.3.2
-def approximate_frequency_ratio(
-    f1: float, f2: float, d: float = 0.01, divide_by: int = 1
-) -> tuple[int, int, float]:
+def approximate_frequency_ratio(f1: float, f2: float, d: float = 0.01, divide_by: int = 1) -> tuple[int, int, float]:
     r_init = f2 / f1
     r_min, r_max = (r_init * (1 - d), r_init * (1 + d))
     a_low, b_low = math.floor(r_init), 1
@@ -34,9 +32,7 @@ def approximate_frequency_ratio(
     return (a, b, r)
 
 
-def relative_periodicity(
-    semitones: list[int], reference_index: int = 0, d: float = 0.011, sort: bool = True
-) -> int:
+def relative_periodicity(semitones: list[int], reference_index: int = 0, d: float = 0.011, sort: bool = True) -> int:
     reference_freq = 2 ** (semitones[reference_index] / 12)
     ratios = [
         approximate_frequency_ratio(
@@ -63,13 +59,8 @@ def smoothed_relative_periodicity(
     relative_periodicities: list[int] = []
     for i in range(len(current_semitones)):
         current_semitones = [s - current_semitones[i] for s in current_semitones]
-        relative_periodicities.append(
-            relative_periodicity(current_semitones, reference_index=i, d=d)
-        )
-    if log:
-        smoothed_periodicity = sum([math.log2(rp) for rp in relative_periodicities]) / n
-    else:
-        smoothed_periodicity = sum(relative_periodicities) / n
+        relative_periodicities.append(relative_periodicity(current_semitones, reference_index=i, d=d))
+    smoothed_periodicity = sum([math.log2(rp) for rp in relative_periodicities]) / n if log else sum(relative_periodicities) / n
     if verbose:
         print(f"Chord {semitones}, dissonance: {smoothed_periodicity}")
 
@@ -175,7 +166,4 @@ def dissonance(
     elif method == "max_pairwise":
         return max_pairwise_dissonance(semitones)
     else:
-        raise ValueError(
-            f"Unknown dissonance method {method!r}. "
-            f"Choose from: 'smoothed', 'smoothed_raw', 'relative', 'pairwise', 'max_pairwise'."
-        )
+        raise ValueError(f"Unknown dissonance method {method!r}. Choose from: 'smoothed', 'smoothed_raw', 'relative', 'pairwise', 'max_pairwise'.")
