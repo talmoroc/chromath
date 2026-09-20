@@ -4,6 +4,8 @@ from . import chroma_ops
 from . import cycle_ops
 from . import interval_ops
 from . import freq_ops
+from . import score_functions
+from . import solver
 
 __all__ = [
     "validation",
@@ -12,4 +14,6 @@ __all__ = [
     "cycle_ops",
     "interval_ops",
     "freq_ops",
+    "score_functions",
+    "solver",
 ]
