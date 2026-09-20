@@ -1,31 +1,32 @@
-import numpy as np
-import pandas as pd
 from itertools import combinations
 
-from ..types import DT, ChromaArray, ScaleLookupArray#, ScaleLookupCounts
-from ..constants import DefaultMusicSystem as MS
-from . import interval_ops as interval
-#  from . import conversion as conv
+import numpy as np
+import pandas as pd
 
+from ..constants import DefaultMusicSystem as MS
+from ..types import DT, ChromaArray, ScaleLookupArray  # , ScaleLookupCounts
+from . import interval_ops as interval
+
+#  from . import conversion as conv
 from .score_functions import (  # noqa: F401
-    ScoringContext,
+    _SENTINEL,
+    _TRIAD_PATTERNS,
+    AGGREGATION_METHODS,
+    DEFAULT_SCORE_FNS,
     ScoreFn,
+    ScoringContext,
+    _normalize_minmax,
+    _semitone_distance,
     batch_alteration_cost,
-    batch_resolution_score,
-    batch_voice_leading_cost,
-    batch_root_distance,
     batch_dissonance,
+    batch_resolution_score,
+    batch_root_distance,
     batch_tertian_score,
+    batch_voice_leading_cost,
+    default_score_fns,
     estimate_roots,
     root_position_semitones,
-    default_score_fns,
-    DEFAULT_SCORE_FNS,
-    AGGREGATION_METHODS,
-    _normalize_minmax,
-    _TRIAD_PATTERNS,
-    _semitone_distance,
 )
-from .score_functions import _SENTINEL
 
 
 def compute_tonality_weights(
@@ -79,9 +80,7 @@ def generate_all_chromas(min_notes: int = 2, max_notes: int = 7) -> ChromaArray:
     return np.array(rows, dtype=DT.Chr)
 
 
-def chromas_to_padded_semitones(
-    chromas: ChromaArray, max_notes: int = 7
-) -> tuple[np.ndarray, np.ndarray]:
+def chromas_to_padded_semitones(chromas: ChromaArray, max_notes: int = 7) -> tuple[np.ndarray, np.ndarray]:
     """
     Convert a batch of chroma vectors to padded semitone arrays.
 
@@ -181,9 +180,7 @@ def score_candidates(
     components: dict[str, np.ndarray] = {}
     for name, arr in norm_subscores.items():
         if arr.ndim == 1:
-            components[name] = np.broadcast_to(
-                arr[np.newaxis, :], (n_scales, arr.shape[0])
-            )
+            components[name] = np.broadcast_to(arr[np.newaxis, :], (n_scales, arr.shape[0]))
         else:
             components[name] = arr
 
@@ -193,6 +190,7 @@ def score_candidates(
         resolved_weights[sf.name] = weights.get(sf.name, sf.default_weight)
 
     from .score_functions import AGGREGATION_METHODS as _agg_methods
+
     agg_fn = _agg_methods.get(aggregation, _agg_methods["weighted_sum"])
     scores = agg_fn(components, resolved_weights)
 
@@ -235,14 +233,10 @@ def score_candidate_breakdown(
         weights = {}
 
     ctx = ScoringContext(
-        candidate_interps=candidate_interps[
-            scale_idx : scale_idx + 1, candidate_idx : candidate_idx + 1
-        ],
+        candidate_interps=candidate_interps[scale_idx : scale_idx + 1, candidate_idx : candidate_idx + 1],
         start_interp=start_interp[scale_idx : scale_idx + 1],
         end_interp=end_interp[scale_idx : scale_idx + 1],
-        candidate_semitones=candidate_semitones[
-            candidate_idx : candidate_idx + 1
-        ],
+        candidate_semitones=candidate_semitones[candidate_idx : candidate_idx + 1],
         start_semitones=start_semitones,
         end_semitones=end_semitones,
         candidate_lengths=np.array([candidate_length], dtype=DT.St),
@@ -300,7 +294,7 @@ def results_to_dataframe(result: dict, top_n: int | None = None) -> pd.DataFrame
     if top_n is not None:
         indices = indices[:top_n]
 
-    mean_scores = (result["scores"].T @ result["_tonality_weights"])
+    mean_scores = result["scores"].T @ result["_tonality_weights"]
     raw = result.get("raw_subscores", {})
     norm = result.get("norm_subscores", {})
 
@@ -345,7 +339,7 @@ def solve(
     dissonance_method: str = "smoothed",
     aggregation: str = "weighted_sum",
     tonality_weights: np.ndarray | None = None,
-    preceding_root: int | None = None
+    preceding_root: int | None = None,
 ) -> dict:
     """Find the best candidate chords for start → ? → end across multiple scales.
 
@@ -389,8 +383,8 @@ def solve(
         lk, ct = interval.build_all_scale_lookups(sc)
         all_lookups.append(lk)
         all_counts.append(ct)
-    lookups = np.concatenate(all_lookups, axis=0)   # (n_scales, 12, 2, 2)
-    counts = np.concatenate(all_counts, axis=0)     # (n_scales, 12)
+    lookups = np.concatenate(all_lookups, axis=0)  # (n_scales, 12, 2, 2)
+    counts = np.concatenate(all_counts, axis=0)  # (n_scales, 12)
 
     # Generate candidates
     candidates = generate_all_chromas(min_notes, max_notes)
@@ -454,7 +448,7 @@ def solve(
         tonality_weights = compute_tonality_weights(preceding_root)
     # Reshape weights to (n_scales, 1) for broadcasting: scores @ weights
     mean_scores = scores.T @ tonality_weights  # (n_cand,)
-    
+
     eligible = np.ones(len(candidates), dtype=bool)
     if exclude_same_root:
         eligible &= (cand_roots != start_root) & (cand_roots != end_root)

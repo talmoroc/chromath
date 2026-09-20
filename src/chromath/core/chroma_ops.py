@@ -1,11 +1,12 @@
+from typing import Literal, overload
+
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-from typing import overload, Literal
 
-from ..types import DT, ChromaArray, ScaleChromaArray
 from ..constants import DefaultMusicSystem as MS
-from ..core.validation import validate_chroma_array
 from ..core.conversion import chroma_to_semitones
+from ..core.validation import validate_chroma_array
+from ..types import DT, ChromaArray, ScaleChromaArray
 
 # GENERATION
 
@@ -34,7 +35,7 @@ def from_bits(v: NDArray[np.uint8]) -> ChromaArray:
 
 
 @overload
-def invert(s: ScaleChromaArray, pivot: int = 0) -> ScaleChromaArray: ...
+def invert(c: ScaleChromaArray, pivot: int = 0) -> ScaleChromaArray: ...
 
 
 @overload
@@ -67,32 +68,33 @@ def isin(c: ChromaArray, container: ChromaArray) -> NDArray[DT.Chr]:
 def common_tones(c1: ChromaArray, c2: ChromaArray) -> NDArray[DT.St]:
     if c1.ndim > 1 and c2.ndim > 1:
         c1 = c1[..., np.newaxis, :]
-    return np.sum(c2 & c1, axis=-1, dtype=DT.St)
+    result = np.sum(c2 & c1, axis=-1)
+    return np.asarray(result, dtype=DT.St)
 
 
 # Hamming distance : good for comparing similar objects. Difference in tones relative to the 12 tones
 def hamming_dist(c1: ChromaArray, c2: ChromaArray) -> NDArray:
-    """ Measures how many tones are different between two chromas. Relative to the total number of tones in the music system."""
+    """Measures how many tones are different between two chromas. Relative to the total number of tones in the music system."""
     ct = common_tones(c1, c2)
     return (c1.sum(axis=-1) + c2.sum(axis=-1) - 2 * ct) / MS.tones
 
 
 # Jaccard distance : good for comparing similar objects. Difference in tones within the space of c1 union c2
 def jaccard_dist(c1: ChromaArray, c2: ChromaArray) -> NDArray:
-    """ Measures how many tones are shared between two chromas. Relative to the total number of tones present in either chroma."""
+    """Measures how many tones are shared between two chromas. Relative to the total number of tones present in either chroma."""
     ct = common_tones(c1, c2)
     return 1 - ct / (c1.sum(axis=-1) + c2.sum(axis=-1) - ct)
 
 
 # Assymetric Tversky : inclusion of an object within another one
 def tversky_dist(from_: ChromaArray, to_: ChromaArray) -> NDArray:
-    """ Measures how much 'from_' is included in 'to_'. """
+    """Measures how much 'from_' is included in 'to_'."""
     ct = common_tones(from_, to_)
     return 1 - ct / from_.sum(axis=-1)[..., np.newaxis]
 
 
-def closest(from_: ChromaArray, to_: ChromaArray, n: int = 1, dist: Literal['hamming', 'jaccard', 'tversky'] = 'tversky') -> NDArray[DT.St]:
-    """ Returns the indices of the closest chromas in 'to_' for each chroma in 'from_' based on the specified distance metric. """
+def closest(from_: ChromaArray, to_: ChromaArray, n: int = 1, dist: Literal["hamming", "jaccard", "tversky"] = "tversky") -> NDArray[DT.St]:
+    """Returns the indices of the closest chromas in 'to_' for each chroma in 'from_' based on the specified distance metric."""
     if from_.ndim > 1 and to_.ndim > 1:
         from_ = from_[..., np.newaxis, :]
     closest = np.argsort(-common_tones(from_, to_), stable=True, axis=-1).astype(DT.St)

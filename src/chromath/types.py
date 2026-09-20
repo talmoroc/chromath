@@ -1,14 +1,16 @@
-import numpy as np
 from typing import Annotated, Final
-from numpy.typing import NDArray
 
+import numpy as np
+from numpy.typing import NDArray
 
 # NOTE: np.dtypes used to limit memory usage (bool + int8)
 # If it vectorization becomes a bottleneck, use int32/int64 everywhere
 
+
 class DT:
     Chr: Final = np.bool_  # Chroma
     St: Final = np.int8  # Semitones or rank
+    Score: Final = np.float32
 
 
 # Chroma Types
@@ -21,23 +23,15 @@ type IntervalArray = Annotated[NDArray[DT.St], "Shape: (..., 2) (degree, tone) r
 type ScaleIntervalArray = Annotated[IntervalArray, "Shape: (..., MS.degrees, 2)"]
 
 # Interpreted Interval Types (degree + semitone + alteration)
-type InterpretedIntervalArray = Annotated[
-    NDArray[DT.St], "Shape: (..., 3) (degree_0idx, semitone, alteration) per note"
-]
+type InterpretedIntervalArray = Annotated[NDArray[DT.St], "Shape: (..., 3) (degree_0idx, semitone, alteration) per note"]
 
 # Scale Lookup Types (maps each semitone to possible degree/alteration pairs)
-type ScaleLookupArray = Annotated[
-    NDArray[DT.St], "Shape: (..., 12, 2, 2) [semitone, interp_idx, (degree, alteration)]"
-]
-type ScaleLookupCounts = Annotated[
-    NDArray[DT.St], "Shape: (..., 12) number of valid interpretations per semitone"
-]
+type ScaleLookupArray = Annotated[NDArray[DT.St], "Shape: (..., 12, 2, 2) [semitone, interp_idx, (degree, alteration)]"]
+type ScaleLookupCounts = Annotated[NDArray[DT.St], "Shape: (..., 12) number of valid interpretations per semitone"]
 
 # Cycle Types
 type CycleArray = Annotated[NDArray[DT.St], "Shape: (..., MS.tones) tone -> cycle_rank map"]
-type RankArray = Annotated[
-    NDArray[DT.St], "Shape: (..., <= cycle periodicity) cycle_rank -> tone map"
-]
+type RankArray = Annotated[NDArray[DT.St], "Shape: (..., <= cycle periodicity) cycle_rank -> tone map"]
 
 type SymCycleArray = Annotated[NDArray[DT.St], "Shape: (..., tone, 2) with dim for cycle direction"]
 type SymRankArray = Annotated[NDArray[DT.St], "Shape: (..., 2, rank) with dim for cycle direction"]

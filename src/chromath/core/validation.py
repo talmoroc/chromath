@@ -1,20 +1,22 @@
-import numpy as np
 from typing import TypeGuard
-from numpy.typing import NDArray, DTypeLike, ArrayLike
+
+import numpy as np
+from numpy.typing import ArrayLike, DTypeLike, NDArray
+
+from ..constants import DefaultMusicSystem as MS
 from ..types import (
     DT,
     ChromaArray,
-    ScaleChromaArray,
-    IntervalArray,
-    ScaleIntervalArray,
+    CycleArray,
     InterpretedIntervalArray,
+    IntervalArray,
+    ScaleChromaArray,
+    ScaleIntervalArray,
     ScaleLookupArray,
     ScaleLookupCounts,
-    CycleArray,
     SymCycleArray,
     SymRankArray,
 )
-from ..constants import DefaultMusicSystem as MS
 
 
 def validate_array(

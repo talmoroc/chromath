@@ -1,19 +1,12 @@
-from . import validation
-from . import conversion
-from . import chroma_ops
-from . import cycle_ops
-from . import interval_ops
-from . import freq_ops
-from . import score_functions
-from . import solver
+from . import chroma_ops, conversion, cycle_ops, freq_ops, interval_ops, score_functions, solver, validation
 
 __all__ = [
-    "validation",
-    "conversion",
     "chroma_ops",
+    "conversion",
     "cycle_ops",
-    "interval_ops",
     "freq_ops",
+    "interval_ops",
     "score_functions",
     "solver",
+    "validation",
 ]

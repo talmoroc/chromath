@@ -20,17 +20,16 @@ Then pass ``score_fns=default_score_fns() + [MY_SCORE]`` to
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import numpy as np
 from scipy.special import logsumexp as _scipy_logsumexp
 
-from ..types import DT, ChromaArray
 from ..constants import DefaultMusicSystem as MS
-from . import interval_ops as interval
+from ..types import DT, ChromaArray
 from . import freq_ops
-
+from . import interval_ops as interval
 
 _SENTINEL = np.int8(np.iinfo(np.int8).min)  # -128
 
@@ -184,7 +183,7 @@ def batch_voice_leading_cost(
 
 
 def _semitone_distance(a: int, b: int) -> int:
-    """Minimum semitone distance between two pitch-classes (0–6)."""
+    """Minimum semitone distance between two pitch-classes (0-6)."""
     d = abs(a - b) % MS.tones
     return min(d, MS.tones - d)
 
@@ -332,7 +331,7 @@ def batch_dissonance(
     n = chromas.shape[0]
     result = np.empty(n, dtype=np.float64)
     for i in range(n):
-        st = list(np.flatnonzero(chromas[i]))
+        st = [int(x) for x in np.flatnonzero(chromas[i])]
         if roots is not None:
             st = root_position_semitones(st, int(roots[i]))
         result[i] = freq_ops.dissonance(st, method=method)
@@ -520,7 +519,7 @@ def _aggregate_logsumexp(
     if not stacked:
         return np.zeros_like(next(iter(components.values())), dtype=np.float64)
     mat = np.stack(stacked, axis=0)
-    return _scipy_logsumexp(mat, axis=0)
+    return np.asarray(_scipy_logsumexp(mat, axis=0), dtype=DT.Score)
 
 
 def _aggregate_weighted_product(

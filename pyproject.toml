@@ -29,12 +29,34 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "hypothesis>=6.168.0",
     "ipykernel>=7.1.0",
     "ipython>=9.9.0",
     "jupyter>=1.1.1",
     "pytest>=9.0.2",
+    "pytest-watcher>=0.6.3",
     "ruff>=0.14.14",
 ]
 
 [tool.ruff]
-line-length = 100
+line-length = 150
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I", "UP", "SIM", "NPY", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config", "--tb=short", "-q"]
+xfail_strict = true
+markers = [
+    "law: a property quantified over the whole domain, not an example",
+    "slow: exhaustive over the full chroma space; excluded from the watch loop",
+]
+
+[tool.pytest-watcher]
+now = true
+clear = true
+delay = 0.2
+runner = "uv"
+runner_args = ["run", "pytest", "-m", "not slow"]
+patterns = ["*.py"]

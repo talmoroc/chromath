@@ -1,7 +1,8 @@
 import numpy as np
 from numpy.typing import NDArray
-from ..types import DT, ChromaArray, IntervalArray, ScaleChromaArray, ScaleIntervalArray, InterpretedIntervalArray, ScaleLookupArray
+
 from ..constants import DefaultMusicSystem as MS
+from ..types import DT, ChromaArray, InterpretedIntervalArray, IntervalArray, ScaleChromaArray, ScaleIntervalArray, ScaleLookupArray
 from . import validation as val
 
 
@@ -30,13 +31,12 @@ def scale_chroma_to_degree(v: ScaleChromaArray) -> ScaleIntervalArray:
     return val.validate_scale_interval_array(deg)
 
 
-def chroma_to_interpreted(
-    v: ChromaArray, lookup: ScaleLookupArray
-) -> InterpretedIntervalArray:
+def chroma_to_interpreted(v: ChromaArray, lookup: ScaleLookupArray) -> InterpretedIntervalArray:
     """
     Interpret a chroma vector through a scale lookup (single-lookup fast path).
     """
     from .interval_ops import _interpret_single_lookup
+
     st = chroma_to_semitones(v)
     return _interpret_single_lookup(st, lookup)
 
