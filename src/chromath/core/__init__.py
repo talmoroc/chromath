@@ -1,12 +1,11 @@
-from . import chroma_ops, conversion, cycle_ops, freq_ops, interval_ops, score_functions, solver, validation
+from . import chroma, conversion, cycle, freq_ops, interval, scores, solver
 
 __all__ = [
-    "chroma_ops",
+    "chroma",
     "conversion",
-    "cycle_ops",
+    "cycle",
     "freq_ops",
-    "interval_ops",
-    "score_functions",
+    "interval",
+    "scores",
     "solver",
-    "validation",
 ]

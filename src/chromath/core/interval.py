@@ -9,15 +9,13 @@ from ..constants import DefaultMusicSystem as MS
 from ..types import (
     DT,
     InterpretedIntervalArray,
-    IntervalArray,
-    ScaleIntervalArray,
     ScaleLookupArray,
     ScaleLookupCounts,
+    SemitonesArray,
 )
-from . import validation as val
 
 
-def to_int(v: IntervalArray) -> int:
+def to_int(v: SemitonesArray) -> int:
     """
     Converts an IntervalArray to its bitwise integer representation based on semitones.
     """
@@ -27,7 +25,7 @@ def to_int(v: IntervalArray) -> int:
     return int(np.dot(chroma, MS.powers))
 
 
-def from_bits(bitwise_repr: int) -> IntervalArray:
+def from_bits(bitwise_repr: int) -> SemitonesArray:
     """
     Reconstructs an IntervalArray from a bitwise integer representation.
     Note: Degrees are set to 0 as they cannot be inferred from bits alone.
@@ -41,14 +39,14 @@ def from_bits(bitwise_repr: int) -> IntervalArray:
     return res
 
 
-def isin(v: IntervalArray, e: IntervalArray) -> bool:
+def isin(v: SemitonesArray, e: SemitonesArray) -> bool:
     """
     Checks if a specific interval [degree, semitone] exists within a collection of intervals.
     """
     return bool(np.any(np.all(e == v, axis=-1)))
 
 
-def shift(v: IntervalArray, n: int) -> IntervalArray:
+def shift(v: SemitonesArray, n: int) -> SemitonesArray:
     """
     Transposes the interval(s) by n semitones.
     """
@@ -57,9 +55,9 @@ def shift(v: IntervalArray, n: int) -> IntervalArray:
     return res
 
 
-def from_scale(scale_semitones: list[int] | np.ndarray) -> ScaleIntervalArray:
+def from_scale(scale_semitones: list[int] | np.ndarray) -> SemitonesArray:
     """
-    Converts a scale (list of semitones) to a ScaleIntervalArray.
+    Converts a scale (list of semitones) to a IntervalArray.
     Each interval is represented as (degree, semitone).
     Degrees are 1-indexed (1 through 7 for heptatonic scales).
     """
@@ -69,10 +67,10 @@ def from_scale(scale_semitones: list[int] | np.ndarray) -> ScaleIntervalArray:
     degrees = np.arange(1, MS.degrees + 1, dtype=DT.St)
     semitones = np.array(scale_semitones, dtype=DT.St)
     res = np.column_stack((degrees, semitones))
-    return val.validate_scale_interval_array(res)
+    return res
 
 
-def from_chord(chord_semitones: list[int] | np.ndarray) -> IntervalArray:
+def from_chord(chord_semitones: list[int] | np.ndarray) -> SemitonesArray:
     """
     Converts a chord (list of semitones relative to root) to an IntervalArray.
     Degrees are inferred from sorted position in the chord.
@@ -81,10 +79,10 @@ def from_chord(chord_semitones: list[int] | np.ndarray) -> IntervalArray:
     semitones = np.sort(semitones)
     degrees = np.arange(len(semitones), dtype=DT.St)
     res = np.column_stack((degrees, semitones))
-    return val.validate_interval_array(res)
+    return res
 
 
-def semitone_distance(interval1: IntervalArray, interval2: IntervalArray) -> int:
+def semitone_distance(interval1: SemitonesArray, interval2: SemitonesArray) -> int:
     """
     Computes the semitone distance between two intervals.
     Returns the absolute difference in semitones.
@@ -108,7 +106,7 @@ def scale_distance(scale1_semitones: list[int] | np.ndarray, scale2_semitones: l
     return int(np.sum(np.abs((scale2 - scale1) % MS.tones)))
 
 
-def common_intervals(interval_array1: IntervalArray, interval_array2: IntervalArray) -> IntervalArray:
+def common_intervals(interval_array1: SemitonesArray, interval_array2: SemitonesArray) -> SemitonesArray:
     """
     Finds intervals that appear in both arrays (by semitone value).
     """
@@ -118,10 +116,10 @@ def common_intervals(interval_array1: IntervalArray, interval_array2: IntervalAr
     common_st = np.intersect1d(st1, st2)
     degrees = np.arange(len(common_st), dtype=DT.St)
     res = np.column_stack((degrees, common_st))
-    return val.validate_interval_array(res)
+    return res
 
 
-def invert(v: IntervalArray, pivot: int = 0) -> IntervalArray:
+def invert(v: SemitonesArray, pivot: int = 0) -> SemitonesArray:
     """
     Musical inversion of intervals around a pivot (default 0 semitones).
     """
@@ -192,7 +190,7 @@ def build_scale_lookup(
 
         counts[st] = k
 
-    return val.validate_scale_lookup(lookup), val.validate_scale_lookup_counts(counts)
+    return lookup, counts
 
 
 def build_all_scale_lookups(
