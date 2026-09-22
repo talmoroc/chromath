@@ -1,6 +1,4 @@
-from . import constants
-from . import core
-from . import naming
+from . import constants, core, naming
 
 __all__ = [
     "constants",
