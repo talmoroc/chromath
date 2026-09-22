@@ -186,3 +186,4 @@ cython_debug/
 .cursorindexingignore
 .python-version
 .vscode/launch.json
+.claude/*
