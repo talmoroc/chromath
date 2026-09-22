@@ -1,7 +1,7 @@
 """Every chroma operation is elementwise.
 
 An operation on an array of keys must agree, entry for entry, with the same
-operation applied to each key on its own. That one law covers batching,
+operation applied to each key on its own. That one rule covers batching,
 broadcasting and shape preservation together.
 """
 
@@ -34,50 +34,30 @@ BINARY = [
 KEY_RETURNING = [("transpose", lambda c: chroma.transpose(c, 5)), ("invert", chroma.invert)]
 
 
-# ── The elementwise law ─────────────────────────────────────────────────
-
-
-@pytest.mark.law
 @pytest.mark.parametrize(("name", "f"), UNARY, ids=[n for n, _ in UNARY])
-@given(chroma_key_arrays())
-def test_a_unary_operation_is_elementwise(name, f, arr):
-    """f(array)[i] == f(array[i])."""
+@given(chroma_key_arrays(), chroma_key_arrays(shape2d=True))
+def test_a_unary_operation_is_elementwise(name, f, arr, grid):
+    """f(array)[i] == f(array[i]), and the leading shape survives."""
     batched = f(arr)
-    one_by_one = [f(np.uint16(k)) for k in arr]
     assert len(batched) == len(arr)
-    for got, expected in zip(batched, one_by_one, strict=True):
-        assert np.array_equal(got, expected)
+    for got, key in zip(batched, arr, strict=True):
+        assert np.array_equal(got, f(np.uint16(key)))
+    assert np.asarray(f(grid)).shape[: grid.ndim] == grid.shape
 
 
-@pytest.mark.law
 @pytest.mark.parametrize(("name", "f"), BINARY, ids=[n for n, _ in BINARY])
-@given(chroma_key_arrays(), chroma_key_arrays())
-def test_a_binary_operation_is_elementwise(name, f, a, b):
-    """f(x, y)[i] == f(x[i], y[i]), over the common length."""
+@given(chroma_key_arrays(1, 5), chroma_key_arrays(1, 5), chromas)
+def test_a_binary_operation_is_elementwise(name, f, a, b, scalar):
+    """Pairwise over equal lengths, broadcast against a scalar, table when nested."""
     n = min(len(a), len(b))
-    a, b = a[:n], b[:n]
-    batched = f(a, b)
     for i in range(n):
-        assert np.array_equal(batched[i], f(np.uint16(a[i]), np.uint16(b[i])))
+        assert np.array_equal(f(a[:n], b[:n])[i], f(np.uint16(a[i]), np.uint16(b[i])))
 
+    right, left = f(a, scalar), f(scalar, a)
+    for i, key in enumerate(a):
+        assert np.array_equal(right[i], f(np.uint16(key), np.uint16(scalar)))
+        assert np.array_equal(left[i], f(np.uint16(scalar), np.uint16(key)))
 
-@pytest.mark.law
-@pytest.mark.parametrize(("name", "f"), BINARY, ids=[n for n, _ in BINARY])
-@given(chroma_key_arrays(), chromas)
-def test_a_binary_operation_broadcasts_a_scalar(name, f, arr, scalar):
-    """A lone key on either side broadcasts across the array."""
-    right = f(arr, scalar)
-    left = f(scalar, arr)
-    for i, k in enumerate(arr):
-        assert np.array_equal(right[i], f(np.uint16(k), np.uint16(scalar)))
-        assert np.array_equal(left[i], f(np.uint16(scalar), np.uint16(k)))
-
-
-@pytest.mark.law
-@pytest.mark.parametrize(("name", "f"), BINARY, ids=[n for n, _ in BINARY])
-@given(chroma_key_arrays(1, 5), chroma_key_arrays(1, 5))
-def test_a_binary_operation_builds_a_pairwise_table(name, f, a, b):
-    """a[:, None] against b gives every pair, shape (len(a), len(b))."""
     table = f(a[:, np.newaxis], b)
     assert table.shape == (len(a), len(b))
     for i in range(len(a)):
@@ -85,19 +65,6 @@ def test_a_binary_operation_builds_a_pairwise_table(name, f, a, b):
             assert np.array_equal(table[i, j], f(np.uint16(a[i]), np.uint16(b[j])))
 
 
-# ── Shape and dtype ─────────────────────────────────────────────────────
-
-
-@pytest.mark.law
-@pytest.mark.parametrize(("name", "f"), UNARY, ids=[n for n, _ in UNARY])
-@given(chroma_key_arrays(shape2d=True))
-def test_a_unary_operation_preserves_leading_shape(name, f, arr):
-    """A (r, 2) batch stays (r, 2), plus any axes the result adds."""
-    out = np.asarray(f(arr))
-    assert out.shape[: arr.ndim] == arr.shape
-
-
-@pytest.mark.law
 @pytest.mark.parametrize(("name", "f"), KEY_RETURNING, ids=[n for n, _ in KEY_RETURNING])
 @given(chroma_key_arrays())
 def test_an_operation_returning_keys_keeps_the_key_dtype(name, f, arr):
@@ -106,34 +73,15 @@ def test_an_operation_returning_keys_keeps_the_key_dtype(name, f, arr):
     assert np.asarray(f(np.uint16(1))).dtype == np.uint16
 
 
-@pytest.mark.law
-@given(chroma_key_arrays())
-def test_to_vector_adds_a_trailing_pitch_class_axis(arr):
+@given(chroma_key_arrays(), chroma_key_arrays(shape2d=True))
+def test_conversion_round_trips_over_a_batch(arr, grid):
+    """to_vector adds a trailing pitch-class axis and from_vector removes it."""
     assert chroma.to_vector(arr).shape == (*arr.shape, MS.tones)
-
-
-@pytest.mark.law
-@given(chroma_key_arrays())
-def test_from_vector_removes_it(arr):
-    """Round trip over a whole batch at once."""
     assert np.array_equal(chroma.from_vector(chroma.to_vector(arr)), arr)
+    assert np.array_equal(chroma.from_vector(chroma.to_vector(grid)), grid)
 
 
-@pytest.mark.law
-@given(chroma_key_arrays(shape2d=True))
-def test_the_round_trip_survives_two_leading_axes(arr):
-    assert np.array_equal(chroma.from_vector(chroma.to_vector(arr)), arr)
-
-
-# ── The one operation that is not elementwise ───────────────────────────
-
-
-@pytest.mark.law
 def test_to_st_rejects_a_batch():
-    """Semitone lists are ragged, so to_st takes one chroma and says so.
-
-    Silently flattening a batch is how the old array-based invert produced a
-    plausible wrong answer instead of an error.
-    """
+    """Semitone lists are ragged, so to_st takes one chroma and says so."""
     with pytest.raises(ValueError):
         chroma.to_st(np.array([chroma.from_st(0, 4, 7), chroma.from_st(0, 3, 7)]))
