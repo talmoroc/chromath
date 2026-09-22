@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 
 from ..constants import DefaultMusicSystem as MS
-from ..types import DT, ChromaArray, ScaleLookupArray  # , ScaleLookupCounts
-from . import interval_ops as interval
+from ..types import DT, ChromaBoolArray, ScaleLookupArray
+from . import interval as interval
 
 #  from . import conversion as conv
-from .score_functions import (  # noqa: F401
+from .scores import (  # noqa: F401
     _SENTINEL,
     _TRIAD_PATTERNS,
     AGGREGATION_METHODS,
@@ -64,7 +64,7 @@ def compute_tonality_weights(
     return weights
 
 
-def generate_all_chromas(min_notes: int = 2, max_notes: int = 7) -> ChromaArray:
+def generate_all_chromas(min_notes: int = 2, max_notes: int = 7) -> ChromaBoolArray:
     """
     Generate all binary subsets of {0..11} with cardinality in [min_notes, max_notes].
 
@@ -74,13 +74,13 @@ def generate_all_chromas(min_notes: int = 2, max_notes: int = 7) -> ChromaArray:
     rows: list[np.ndarray] = []
     for k in range(min_notes, max_notes + 1):
         for combo in combinations(range(MS.tones), k):
-            row = np.zeros(MS.tones, dtype=DT.Chr)
+            row = np.zeros(MS.tones, dtype=DT.Chroma)
             row[list(combo)] = True
             rows.append(row)
-    return np.array(rows, dtype=DT.Chr)
+    return np.array(rows, dtype=DT.Chroma)
 
 
-def chromas_to_padded_semitones(chromas: ChromaArray, max_notes: int = 7) -> tuple[np.ndarray, np.ndarray]:
+def chromas_to_padded_semitones(chromas: ChromaBoolArray, max_notes: int = 7) -> tuple[np.ndarray, np.ndarray]:
     """
     Convert a batch of chroma vectors to padded semitone arrays.
 
@@ -189,7 +189,7 @@ def score_candidates(
     for sf in score_fns:
         resolved_weights[sf.name] = weights.get(sf.name, sf.default_weight)
 
-    from .score_functions import AGGREGATION_METHODS as _agg_methods
+    from .scores import AGGREGATION_METHODS as _agg_methods
 
     agg_fn = _agg_methods.get(aggregation, _agg_methods["weighted_sum"])
     scores = agg_fn(components, resolved_weights)
@@ -326,8 +326,8 @@ def results_to_dataframe(result: dict, top_n: int | None = None) -> pd.DataFrame
 
 
 def solve(
-    start_chroma: ChromaArray,
-    end_chroma: ChromaArray,
+    start_chroma: ChromaBoolArray,
+    end_chroma: ChromaBoolArray,
     scale_semitones: list[np.ndarray],
     min_notes: int = 2,
     max_notes: int = 7,
