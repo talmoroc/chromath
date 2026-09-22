@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ..constants import DefaultMusicSystem as MS
-from ..types import DT, ChromaArray, ChromaBoolArray, SemitonesArray
+from ..types import DT, ChromaArray, SemitonesArray
 from . import chroma
 
 type Direction = Literal["forward", "backward", "min"]
