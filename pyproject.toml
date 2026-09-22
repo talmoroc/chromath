@@ -50,15 +50,11 @@ select = ["E", "F", "B", "I", "UP", "SIM", "NPY", "RUF"]
 testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config", "--tb=short", "-q"]
 xfail_strict = true
-markers = [
-    "law: a property quantified over the whole domain, not an example",
-    "slow: exhaustive over the full chroma space; excluded from the watch loop",
-]
 
 [tool.pytest-watcher]
 now = true
 clear = true
 delay = 0.2
 runner = "uv"
-runner_args = ["run", "pytest", "-m", "not slow"]
+runner_args = ["run", "pytest"]
 patterns = ["*.py"]
