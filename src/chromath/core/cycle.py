@@ -6,16 +6,7 @@ from numpy.typing import NDArray
 from ..constants import DefaultMusicSystem as MS
 from ..types import (
     DT,
-    ChromaArray,
-    CycleArray,
-    RankArray,
-    SymCycleArray,
-    SymRankArray,
-)
-from .validation import (
-    validate_chroma_array,
-    validate_cycle_array,
-    validate_sym_rank_array,
+    ChromaBoolArray,
 )
 
 
@@ -33,7 +24,7 @@ def _generate_cycle_tones(step: int) -> NDArray:
     return cycle_tones
 
 
-def _generate_cycle_vector(step: int) -> tuple[CycleArray, ChromaArray]:
+def _generate_cycle_vector(step: int) -> tuple[ChromaBoolArray, ChromaBoolArray]:
     """
     Generator for a Cycle.
 
@@ -60,46 +51,46 @@ def _generate_cycle_vector(step: int) -> tuple[CycleArray, ChromaArray]:
     cycle_tones = _generate_cycle_tones(step)
     cycle_vec = np.full(MS.tones, -1, dtype=DT.St)
     cycle_vec[cycle_tones] = np.arange(periodicity(step))
-    mask = np.where(cycle_vec == -1, 0, 1).astype(DT.Chr)
-    return validate_cycle_array(cycle_vec), validate_chroma_array(mask)
+    mask = np.where(cycle_vec == -1, 0, 1).astype(DT.Chroma)
+    return cycle_vec, mask
 
 
 # Compute the cycle rank of the tones relative to each tone
-def generate_sym_cycle_matrix(step: int) -> SymCycleArray:
+def generate_sym_cycle_matrix(step: int) -> ChromaBoolArray:
     pos_vec, _ = _generate_cycle_vector(step)
     neg_vec, _ = _generate_cycle_vector(-step)
     sym_vec = np.array([pos_vec, neg_vec])
     idx = np.arange(MS.tones)
     shift_indices = (idx - idx[:, np.newaxis]) % MS.tones
     cycle_array = sym_vec[:, shift_indices].transpose(1, 0, 2)  # (tone, direction, tone) -> rank
-    return validate_cycle_array(cycle_array)
+    return cycle_array
 
 
 # Compute the cycle semitones series starting on each tone
-def _matrix_over_ranks(c: CycleArray) -> RankArray:
+def _matrix_over_ranks(c: ChromaBoolArray) -> ChromaBoolArray:
     semitones_series = [(c + i) % MS.tones for i in range(MS.tones)]
     return np.array(semitones_series, dtype=DT.St)
 
 
-def generate_sym_rank_array(step: int) -> SymRankArray:
+def generate_sym_rank_array(step: int) -> ChromaBoolArray:
     pos_rank = _generate_cycle_tones(step)
     neg_rank = _generate_cycle_tones(-step)
     sym_rank = np.array([pos_rank, neg_rank])
     rank_array = np.array([(sym_rank + i) % 12 for i in range(MS.tones)], dtype=DT.St)
-    return validate_sym_rank_array(rank_array, periodicity(step))
+    return rank_array
 
 
 # UTILITIES
 # TODO: rendre ça compatible avec des matrices
-def get_tone_from_rank(r: SymRankArray, rank: int, relative_to: int = 0) -> int:
+def get_tone_from_rank(r: ChromaBoolArray, rank: int, relative_to: int = 0) -> int:
     return r[relative_to, int(rank < 0), rank]
 
 
-def get_rank_from_tone(c: SymCycleArray, tone: int, relative_to: int = 0) -> SymRankArray:
+def get_rank_from_tone(c: ChromaBoolArray, tone: int, relative_to: int = 0) -> ChromaBoolArray:
     return c[relative_to, :, tone]
 
 
-def dist(c: SymCycleArray, tone1: int, tone2: int, signed=False) -> int:
+def dist(c: ChromaBoolArray, tone1: int, tone2: int, signed=False) -> int:
     relative_rank = c[tone1, :, tone2]
     dist = relative_rank.min()
     if signed and relative_rank.argmin() == 1:
@@ -107,5 +98,5 @@ def dist(c: SymCycleArray, tone1: int, tone2: int, signed=False) -> int:
     return dist
 
 
-def get_closest_tones(r: SymRankArray, tone: int, n: int = 1) -> SymCycleArray:
+def get_closest_tones(r: ChromaBoolArray, tone: int, n: int = 1) -> ChromaBoolArray:
     return r[tone, :, :]

@@ -27,9 +27,9 @@ import numpy as np
 from scipy.special import logsumexp as _scipy_logsumexp
 
 from ..constants import DefaultMusicSystem as MS
-from ..types import DT, ChromaArray
+from ..types import DT, ChromaBoolArray
 from . import freq_ops
-from . import interval_ops as interval
+from . import interval as interval
 
 _SENTINEL = np.int8(np.iinfo(np.int8).min)  # -128
 
@@ -37,6 +37,7 @@ _SENTINEL = np.int8(np.iinfo(np.int8).min)  # -128
 # ---------------------------------------------------------------------------
 # Types
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ScoringContext:
@@ -99,6 +100,7 @@ class ScoreFn:
 # Batch utility functions
 # ---------------------------------------------------------------------------
 
+
 def batch_alteration_cost(interpretations: np.ndarray) -> np.ndarray:
     """Sum of |alteration| per chord.
 
@@ -142,14 +144,9 @@ def batch_resolution_score(
     abs_diff = np.where(to_valid_mask[..., np.newaxis, :], abs_diff, 999)
 
     closest_idx = np.argmin(abs_diff, axis=-1)
-    closest_diff = np.take_along_axis(
-        diff, closest_idx[..., np.newaxis], axis=-1
-    ).squeeze(-1)
+    closest_diff = np.take_along_axis(diff, closest_idx[..., np.newaxis], axis=-1).squeeze(-1)
 
-    resolves = (
-        (np.sign(closest_diff) == np.sign(from_alt))
-        & (np.abs(closest_diff) <= 2)
-    )
+    resolves = (np.sign(closest_diff) == np.sign(from_alt)) & (np.abs(closest_diff) <= 2)
     resolves = resolves & has_alt
 
     good = resolves.sum(axis=-1).astype(np.float64)
@@ -206,15 +203,18 @@ def batch_root_distance(
     return cof + 0.5 * semi
 
 
-_TRIAD_PATTERNS = np.array([
-    [0, 4, 7],   # major
-    [0, 3, 7],   # minor
-    [0, 3, 6],   # diminished
-    [0, 4, 8],   # augmented
-], dtype=np.int16)
+_TRIAD_PATTERNS = np.array(
+    [
+        [0, 4, 7],  # major
+        [0, 3, 7],  # minor
+        [0, 3, 6],  # diminished
+        [0, 4, 8],  # augmented
+    ],
+    dtype=np.int16,
+)
 
 
-def batch_tertian_score(chromas: ChromaArray) -> np.ndarray:
+def batch_tertian_score(chromas: ChromaBoolArray) -> np.ndarray:
     """Check whether each chord contains a standard triad.
 
     Returns:
@@ -235,9 +235,7 @@ def batch_tertian_score(chromas: ChromaArray) -> np.ndarray:
     return result
 
 
-def _tertian_chain(
-    candidate: int, notes: set[int], max_gaps: int = 1
-) -> tuple[int, int]:
+def _tertian_chain(candidate: int, notes: set[int], max_gaps: int = 1) -> tuple[int, int]:
     """Walk a tertian chain from *candidate*, allowing gaps."""
     covered = {candidate}
     visited = {candidate}
@@ -278,7 +276,7 @@ def _tertian_chain(
     return len(covered), len(visited)
 
 
-def estimate_roots(chromas: ChromaArray) -> np.ndarray:
+def estimate_roots(chromas: ChromaBoolArray) -> np.ndarray:
     """Estimate the most likely root pitch-class for each chord."""
     n = chromas.shape[0]
     roots = np.zeros(n, dtype=DT.St)
@@ -319,7 +317,7 @@ def root_position_semitones(semitones: list[int], root: int) -> list[int]:
 
 
 def batch_dissonance(
-    chromas: ChromaArray,
+    chromas: ChromaBoolArray,
     roots: np.ndarray | None = None,
     method: str = "smoothed",
 ) -> np.ndarray:
@@ -342,6 +340,7 @@ def batch_dissonance(
 # Normalization helpers
 # ---------------------------------------------------------------------------
 
+
 def _normalize_minmax(arr: np.ndarray) -> np.ndarray:
     """Min-max normalize to [0, 1]. Returns 0 if range is zero."""
     lo = arr.min()
@@ -354,6 +353,7 @@ def _normalize_minmax(arr: np.ndarray) -> np.ndarray:
 # ---------------------------------------------------------------------------
 # Individual score function implementations
 # ---------------------------------------------------------------------------
+
 
 def _compute_alt_cost(ctx: ScoringContext) -> tuple[np.ndarray, np.ndarray]:
     """Alteration cost: sum of |alteration| per chord. Lower = more diatonic."""
@@ -385,12 +385,8 @@ def _make_vl_penalty(
     """Factory for voice-leading penalty with configurable range."""
 
     def compute(ctx: ScoringContext) -> tuple[np.ndarray, np.ndarray]:
-        vl_in = batch_voice_leading_cost(
-            ctx.start_semitones, ctx.candidate_semitones
-        )
-        vl_out = batch_voice_leading_cost(
-            ctx.candidate_semitones, ctx.end_semitones
-        )
+        vl_in = batch_voice_leading_cost(ctx.start_semitones, ctx.candidate_semitones)
+        vl_out = batch_voice_leading_cost(ctx.candidate_semitones, ctx.end_semitones)
         vl_in_pen = np.where(
             vl_in < min_vl,
             min_vl - vl_in,
@@ -443,10 +439,7 @@ def _compute_tertian(ctx: ScoringContext) -> tuple[np.ndarray, np.ndarray]:
 
 def _compute_same_root(ctx: ScoringContext) -> tuple[np.ndarray, np.ndarray]:
     """Same root penalty: 1.0 if candidate shares root with start or end."""
-    raw = (
-        (ctx.candidate_roots == ctx.start_root)
-        | (ctx.candidate_roots == ctx.end_root)
-    ).astype(np.float64)
+    raw = ((ctx.candidate_roots == ctx.start_root) | (ctx.candidate_roots == ctx.end_root)).astype(np.float64)
     norm = raw.copy()
     return raw, norm
 
@@ -494,6 +487,7 @@ DEFAULT_SCORE_FNS = default_score_fns()
 # ---------------------------------------------------------------------------
 # Aggregation functions
 # ---------------------------------------------------------------------------
+
 
 def _aggregate_weighted_sum(
     components: dict[str, np.ndarray],
