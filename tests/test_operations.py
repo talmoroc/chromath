@@ -5,6 +5,9 @@ two of them; rank locates a semitone within a cycle. What the objects *are*
 lives in test_core.py.
 """
 
+from collections import Counter
+from itertools import pairwise, product
+
 import numpy as np
 import pytest
 from conftest import CYCLE_IDS, SAMPLE_CYCLES, SAMPLE_KEYS, chromas, shifts, tones_of
@@ -152,3 +155,113 @@ def test_cycle_rank_anchors():
     assert Cycle(3).rank(6, "min") == -2  # a tie; backward wins
     with pytest.raises(ValueError):
         fifths.rank(0, "sideways")  # type: ignore
+
+
+# ── measuring along a cycle ─────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(("step", "start"), SAMPLE_CYCLES, ids=CYCLE_IDS)
+def test_cycle_dist(step, start):
+    """Steps between two tones the short way round, so never more than half a turn."""
+    c = Cycle(step, start)
+    inside = sorted(tones_of(c.mask))
+
+    for a, b in product(inside, repeat=2):
+        d = int(c.dist(a, b))
+        assert d == int(c.dist(b, a))
+        assert (d == 0) == (a == b)
+        assert 0 <= d <= c.period // 2
+        assert d == abs(int(Cycle(step, a).rank(b, "min")))
+
+    for a, b, e in product(inside, repeat=3):
+        assert c.dist(a, e) <= c.dist(a, b) + c.dist(b, e)
+
+    for outside in set(range(MS.tones)) - set(inside):
+        with pytest.raises(IndexError):
+            c.dist(inside[0], outside)
+        with pytest.raises(IndexError):
+            c.dist(outside, inside[0])
+
+
+@pytest.mark.parametrize(("step", "start"), SAMPLE_CYCLES, ids=CYCLE_IDS)
+def test_cycle_dist_counts_steps_along_the_walk(step, start):
+    """Walking *d* steps either way from a lands on b."""
+    c = Cycle(step, start)
+    inside = sorted(tones_of(c.mask))
+    for a, b in product(inside, repeat=2):
+        here = Cycle(step, a)
+        d = int(c.dist(a, b))
+        assert b in (int(here[d]), int(here[-d]))
+    assert all(c.dist(x, y) == 1 for x, y in pairwise(c[:].tolist()))
+
+
+@pytest.mark.parametrize(("step", "start"), SAMPLE_CYCLES, ids=CYCLE_IDS)
+def test_cycle_dist_belongs_to_the_step_not_the_start(step, start):
+    """Two cycles over the same tones measure them the same way."""
+    c = Cycle(step, start)
+    inside = sorted(tones_of(c.mask))
+    pairs = list(product(inside, repeat=2))
+
+    for other in inside:
+        elsewhere = Cycle(step, other)
+        assert elsewhere.mask == c.mask
+        assert [elsewhere.dist(a, b) for a, b in pairs] == [c.dist(a, b) for a, b in pairs]
+
+    backwards = Cycle((-step) % MS.tones, start)
+    assert [backwards.dist(a, b) for a, b in pairs] == [c.dist(a, b) for a, b in pairs]
+
+
+@pytest.mark.parametrize(("step", "start"), SAMPLE_CYCLES, ids=CYCLE_IDS)
+@pytest.mark.parametrize("shift", [1, 5, 7])
+def test_cycle_dist_moves_with_the_music(step, start, shift):
+    """Transposing the cycle and both tones together changes nothing."""
+    c = Cycle(step, start)
+    moved = Cycle(step, (start + shift) % MS.tones)
+    for a, b in product(sorted(tones_of(c.mask)), repeat=2):
+        assert moved.dist((a + shift) % MS.tones, (b + shift) % MS.tones) == c.dist(a, b)
+
+
+@pytest.mark.parametrize(("step", "start"), SAMPLE_CYCLES, ids=CYCLE_IDS)
+def test_cycle_dist_partitions_the_orbit(step, start):
+    """One tone at distance zero, two at each distance after it, one at the antipode."""
+    c = Cycle(step, start)
+    inside = sorted(tones_of(c.mask))
+    at = Counter(int(c.dist(start, t)) for t in inside)
+
+    assert at[0] == 1
+    assert all(at[d] == 2 for d in range(1, (c.period + 1) // 2))
+    if c.period % 2 == 0 and c.period > 1:
+        assert at[c.period // 2] == 1
+    assert sum(at.values()) == c.period
+
+    for d in range(len(c.sym)):
+        assert {int(t) for t in c.sym[d]} == {t for t in inside if c.dist(start, t) == d}
+
+
+def test_cycle_dist_anchors():
+    fifths = Cycle(7)
+    assert fifths.dist(0, 0) == 0
+    assert fifths.dist(0, 7) == 1  # C to G
+    assert fifths.dist(0, 5) == 1  # C to F, a fifth the other way
+    assert fifths.dist(0, 2) == 2  # C -> G -> D
+    assert fifths.dist(7, 2) == 1
+    assert fifths.dist(0, 6) == 6  # the antipode, as far as a fifth-cycle reaches
+
+    dim = Cycle(3)
+    assert dim.dist(0, 3) == 1
+    assert dim.dist(0, 9) == 1  # one step backward
+    assert dim.dist(0, 6) == 2  # the antipode of a four-step cycle
+
+    assert Cycle(6).dist(0, 6) == 1  # a two-tone cycle has only one distance
+    assert Cycle(0, 4).dist(4, 4) == 0  # standstill
+
+    with pytest.raises(IndexError):
+        dim.dist(0, 1)
+
+
+def test_chromatic_dist_is_the_circular_semitone_gap():
+    """With step one, rank is pitch and the cycle metric is the familiar one."""
+    chromatic = Cycle(1)
+    for a, b in product(range(MS.tones), repeat=2):
+        gap = abs(a - b)
+        assert chromatic.dist(a, b) == min(gap, MS.tones - gap)
