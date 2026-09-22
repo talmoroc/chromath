@@ -1,102 +1,130 @@
 import math
+from collections.abc import Iterator
+from dataclasses import dataclass
+from typing import Literal, get_args
 
 import numpy as np
 from numpy.typing import NDArray
 
 from ..constants import DefaultMusicSystem as MS
-from ..types import (
-    DT,
-    ChromaBoolArray,
-)
+from ..types import DT, ChromaArray, ChromaBoolArray, SemitonesArray
+from . import chroma
+
+type Direction = Literal["forward", "backward", "min"]
 
 
-def periodicity(step: int) -> int:
-    return MS.tones // math.gcd(step, MS.tones)
+@dataclass(frozen=True)
+class Cycle:
+    """An cycle of tones given by repeated transpositions by a fixed step.
 
-
-def is_complete(periodicity: int) -> bool:
-    return periodicity == MS.tones
-
-
-def _generate_cycle_tones(step: int) -> NDArray:
-    pi = periodicity(step)
-    cycle_tones = np.arange(0, step * pi, step, dtype=DT.St) % MS.tones
-    return cycle_tones
-
-
-def _generate_cycle_vector(step: int) -> tuple[ChromaBoolArray, ChromaBoolArray]:
+    - step: the number of semitones between an element of the cycle and the next.
+    - start: the starting semitone of the cycle.
+    - periodicity: the number of tones before the cycle repeats itself. between 1-12
     """
-    Generator for a Cycle.
 
-    A Cycle can be viewed as a cyclic mapping
-    from integers (positive or negative) to tones (0-MusicSystem.tones).
+    step: int
+    start: int = 0
 
-    - It is also useful to have the reverse : which are the 12 tones positions in the cycle.
-    Identical for the circle of fifth.
+    def __post_init__(self):
+        if not 0 <= self.step <= MS.tones - 1:
+            raise ValueError(f"step must be in 0..{MS.tones - 1}, got {self.step}")
+        if not 0 <= self.start < MS.tones:
+            raise ValueError(f"start must be in 0..{MS.tones - 1}, got {self.start}")
 
-    - Given that most cycles are partial in 12-tone temperament the reverse mapping
-    is often partial, so in these cases a mask (ChromaVec) is returned to tell which
-    tones belong to the cycle.
+    def _tone(self, rank):
+        """The semitone reached after *rank* steps. Negative ranks go backward."""
+        return (self.start + self.step * rank) % MS.tones
 
-    Args:
-        step (int): the step of the Cycle, in semitones. Can be negative
+    def _ranks(self, key: slice, stop: int) -> NDArray[np.int64]:
+        """The ranks a slice names, unclamped and signed."""
+        return np.arange(
+            0 if key.start is None else key.start,
+            stop if key.stop is None else key.stop,
+            1 if key.step is None else key.step,
+        )
 
-    Returns:
-        tuple[CycleVec, ChromaVec]:
-            1. cycle_vec : index = tone, value = its rank in the cycle, len = tones
-            2. mask : 1 = a tone is in the cycle, 0 = it is not. If the cycle is complete, it's full of 1.
-                Useful to check before using the first CycleVec (Position in the cycle of a given tone)
+    def __len__(self) -> int:
+        """The length of one full turn."""
+        return self.period
+
+    def __iter__(self) -> Iterator[np.int8]:
+        """One full turn."""
+        yield from self.semitones
+
+    def __getitem__(self, key: int | slice) -> SemitonesArray:
+        """The semitone at a rank, or the semitones a range of ranks names."""
+        if isinstance(key, slice):
+            return np.astype(self._tone(self._ranks(key, self.period)), DT.St)
+        return np.asarray(self._tone(key), dtype=DT.St)
+
+    @property
+    def sym(self) -> "_SymmetricCycle":
+        """Index this instead to alternate sides: ``c.sym[5]``."""
+        return _SymmetricCycle(self)
+
+    @property
+    def period(self) -> int:
+        """How many steps before the cycle closes."""
+        return MS.tones // math.gcd(self.step, MS.tones)
+
+    @property
+    def is_complete(self) -> bool:
+        """A complete cycle cycles through all tones"""
+        return self.period == MS.tones
+
+    @property
+    def semitones(self) -> SemitonesArray:
+        """The tones of this cycle in order, starting from start."""
+        return self[:]
+
+    @property
+    def cycle_chroma(self) -> ChromaArray:
+        """An array of size period with each value giving the chroma (uint16) of the tone."""
+        return np.stack([chroma.from_st(st) for st in self.semitones], axis=-1)
+
+    @property
+    def mask(self) -> ChromaArray:
+        """Twelve-bit key of which tones belong to this cycle."""
+        return chroma.from_st(self.semitones)
+
+    def rank(self, semitone: int, direction: Direction = "min") -> int:
+        """Position of *semitone* within this cycle, or raise if outside it."""
+        chroma_st = chroma.from_st(semitone)
+        if not self.mask & chroma_st:
+            raise IndexError(f"Semitone {semitone} not in Cycle(step={self.step}, start={self.start}) = {self.semitones}")
+
+        forward_rank = int(np.flatnonzero(self.cycle_chroma & chroma_st)[0])
+        backward_rank = -(self.period - forward_rank)
+        match direction:
+            case "forward":
+                return forward_rank
+            case "backward":
+                return forward_rank if forward_rank == 0 else backward_rank
+            case "min":
+                return forward_rank if forward_rank < abs(backward_rank) else backward_rank
+            case _:
+                raise ValueError(f"direction must be one of {get_args(Direction)}")
+
+
+@dataclass(frozen=True)
+class _SymmetricCycle:
+    """The tones of a cycle paired by distance: entry *d* is ranks +d and -d.
+
+    Indexing by a distance gives one pair, by a range of distances a row per
+    distance, so the result is always ``(..., 2)``.
     """
-    step = step % MS.tones
-    cycle_tones = _generate_cycle_tones(step)
-    cycle_vec = np.full(MS.tones, -1, dtype=DT.St)
-    cycle_vec[cycle_tones] = np.arange(periodicity(step))
-    mask = np.where(cycle_vec == -1, 0, 1).astype(DT.Chroma)
-    return cycle_vec, mask
 
+    cycle: Cycle
 
-# Compute the cycle rank of the tones relative to each tone
-def generate_sym_cycle_matrix(step: int) -> ChromaBoolArray:
-    pos_vec, _ = _generate_cycle_vector(step)
-    neg_vec, _ = _generate_cycle_vector(-step)
-    sym_vec = np.array([pos_vec, neg_vec])
-    idx = np.arange(MS.tones)
-    shift_indices = (idx - idx[:, np.newaxis]) % MS.tones
-    cycle_array = sym_vec[:, shift_indices].transpose(1, 0, 2)  # (tone, direction, tone) -> rank
-    return cycle_array
+    def __len__(self) -> int:
+        """The number of distinct distances, counting zero."""
+        return len(self.cycle) // 2 + 1
 
+    def __iter__(self) -> Iterator[SemitonesArray]:
+        """One pair per distance, nearest first."""
+        yield from self[:]
 
-# Compute the cycle semitones series starting on each tone
-def _matrix_over_ranks(c: ChromaBoolArray) -> ChromaBoolArray:
-    semitones_series = [(c + i) % MS.tones for i in range(MS.tones)]
-    return np.array(semitones_series, dtype=DT.St)
-
-
-def generate_sym_rank_array(step: int) -> ChromaBoolArray:
-    pos_rank = _generate_cycle_tones(step)
-    neg_rank = _generate_cycle_tones(-step)
-    sym_rank = np.array([pos_rank, neg_rank])
-    rank_array = np.array([(sym_rank + i) % 12 for i in range(MS.tones)], dtype=DT.St)
-    return rank_array
-
-
-# UTILITIES
-# TODO: rendre ça compatible avec des matrices
-def get_tone_from_rank(r: ChromaBoolArray, rank: int, relative_to: int = 0) -> int:
-    return r[relative_to, int(rank < 0), rank]
-
-
-def get_rank_from_tone(c: ChromaBoolArray, tone: int, relative_to: int = 0) -> ChromaBoolArray:
-    return c[relative_to, :, tone]
-
-
-def dist(c: ChromaBoolArray, tone1: int, tone2: int, signed=False) -> int:
-    relative_rank = c[tone1, :, tone2]
-    dist = relative_rank.min()
-    if signed and relative_rank.argmin() == 1:
-        return -dist
-    return dist
-
-
-def get_closest_tones(r: ChromaBoolArray, tone: int, n: int = 1) -> ChromaBoolArray:
-    return r[tone, :, :]
+    def __getitem__(self, key: int | slice) -> SemitonesArray:
+        """The pair at a distance, or a row per distance a range names."""
+        d = np.asarray(self.cycle._ranks(key, len(self)) if isinstance(key, slice) else key)
+        return np.astype(self.cycle._tone(np.stack([d, -d], axis=-1)), DT.St)
