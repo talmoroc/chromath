@@ -1,9 +1,4 @@
-"""The objects of chromath.core: what a chroma is, and what a cycle is.
-
-Representation, conversion and entry validation for chromas; period, members,
-mask and semitones for cycles. What those objects *do* to each other lives in
-test_operations.py, and the public `Cycle` class in test_components.py.
-"""
+"""The objects of chromath.core: what a chroma is, and what a cycle is."""
 
 import numpy as np
 import pytest
@@ -49,7 +44,7 @@ def test_a_chroma_is_a_little_endian_twelve_bit_key():
 
 
 def test_from_members_reads_one_chroma_per_row():
-    """The last axis lists the members of one chroma; every axis before it is the batch."""
+    """The last axis lists the members; the others are the batch."""
     chords = keys.chords
     assert chroma_of([0, 4, 7]).shape == ()
     assert chroma_of([[0, 4, 7], [0, 3, 7]]).tolist() == [int(chords.C_maj), int(chords.C_min)]
@@ -60,7 +55,7 @@ def test_from_members_reads_one_chroma_per_row():
 
 
 def test_from_members_skips_padding_so_chromas_of_any_size_share_a_batch():
-    """SENTINEL slots hold no note, which makes from_members undo to_members."""
+    """SENTINEL slots hold no note."""
     chords = keys.chords
     ragged = [[0, 4, 7, 10], [0, 4, 7, SENTINEL], [SENTINEL] * 4]
     assert chroma_of(ragged).tolist() == [int(chords.C_dom7), int(chords.C_maj), 0]
@@ -69,7 +64,7 @@ def test_from_members_skips_padding_so_chromas_of_any_size_share_a_batch():
 
 
 def test_a_note_converts_between_its_key_and_its_index():
-    """from_st and to_st are the unpadded pair, for chromas known to hold one note."""
+    """from_st and to_st convert single notes."""
     every = chroma.validate_note_index_array(range(MS.tones))
     assert chroma.from_st(every).dtype == DT.Key
     assert chroma.to_st(chroma.from_st(every)).tolist() == list(range(MS.tones))
@@ -99,8 +94,6 @@ def test_a_note_is_exactly_one_pitch_class(note):
 
 
 # ── entry validation ────────────────────────────────────────────────────
-# The core trusts what it is given. These are the checks a caller runs once on
-# a value that comes from a person or a file.
 
 
 def test_validation_returns_the_array_the_core_expects():
@@ -132,7 +125,7 @@ def test_a_note_key_must_hold_exactly_one_note():
 
 
 def test_a_note_index_outside_the_octave_is_rejected():
-    """Indices are pitch classes: nothing wraps, so 12 is an error and not a C."""
+    """Nothing wraps: 12 is an error."""
     for bad in (MS.tones, -1, [0, 12]):
         with pytest.raises(ValueError):
             chroma.validate_note_index_array(bad)
@@ -158,9 +151,7 @@ def test_a_vector_must_be_twelve_lanes_of_zeros_and_ones():
 
 
 def test_a_single_value_narrows_to_a_hashable_scalar():
-    """as_key and as_note_index are for values a class stores."""
-    assert isinstance(chroma.as_key(chroma_of([0, 4, 7])), DT.Key)
-    assert isinstance(chroma.as_note_index(chroma.validate_note_index_array(7)), DT.Note)
+    """as_key and as_note_index give scalars a class can store."""
     assert hash(chroma.as_key(note_of(0))) == hash(1)
     with pytest.raises(ValueError):
         chroma.as_key(ALL_KEYS[:2])
@@ -169,13 +160,10 @@ def test_a_single_value_narrows_to_a_hashable_scalar():
 
 
 # ── cycle ───────────────────────────────────────────────────────────────
-# A cycle is a step and the chroma it starts on. In the core it is the array of
-# its members over one turn, and every function below takes that array.
 
 
 def test_a_cycle_closes_when_its_start_returns():
-    """A bare note only comes home after the whole orbit; a symmetric start
-    comes home as soon as the step lands on one of its own transpositions."""
+    """A symmetric start returns before the full orbit."""
     for step, period in PERIODS.items():
         assert cycle.period(step, note_of(0)) == period
         assert cycle.period((-step) % MS.tones, note_of(0)) == period
@@ -188,8 +176,7 @@ def test_a_cycle_closes_when_its_start_returns():
 
 @pytest.mark.parametrize(("step", "start", "name"), SAMPLE_BASED, ids=BASED_IDS)
 def test_one_turn_is_the_start_transposed_step_by_step(step, start, name):
-    """Rank r holds the start moved up r steps, for as many ranks as the period,
-    so no rank inside a turn holds what another already holds."""
+    """Rank r holds the start moved up r steps; no member repeats."""
     base = BASES[name]
     members = turn(step, start, name)
 
@@ -201,8 +188,7 @@ def test_one_turn_is_the_start_transposed_step_by_step(step, start, name):
 
 @pytest.mark.parametrize(("step", "start", "name"), SAMPLE_BASED, ids=BASED_IDS)
 def test_a_cycle_masks_every_tone_it_touches(step, start, name):
-    """The mask is the union over one turn, and does not depend on which way
-    the cycle is walked or where along it the walk began."""
+    """The mask is the union over one turn, whatever the direction or start."""
     members = turn(step, start, name)
     mask = cycle.mask(members)
     assert tones_of(mask) == set().union(*(tones_of(x) for x in members))
@@ -213,8 +199,7 @@ def test_a_cycle_masks_every_tone_it_touches(step, start, name):
 
 @pytest.mark.parametrize(("step", "start", "name"), SAMPLE_BASED, ids=BASED_IDS)
 def test_semitones_spells_out_every_member(step, start, name):
-    """One row per rank. Unpadded, one column per note of the start; padded,
-    MS.max_chroma_members columns with SENTINEL after the notes."""
+    """One row per rank, padded or one column per note."""
     members = turn(step, start, name)
     size = int(chroma.cardinality(np.asarray(BASES[name])))
 

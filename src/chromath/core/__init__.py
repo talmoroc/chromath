@@ -1,11 +1,10 @@
-from . import chroma, conversion, cycle, freq_ops, interval, scores, solver
+from . import chroma, cycle, naming, scale, scoring, solver
 
 __all__ = [
     "chroma",
-    "conversion",
     "cycle",
-    "freq_ops",
-    "interval",
-    "scores",
+    "naming",
+    "scale",
+    "scoring",
     "solver",
 ]

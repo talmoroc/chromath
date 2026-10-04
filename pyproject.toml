@@ -53,7 +53,7 @@ include = [
     "src/chromath/types.py",
     "src/chromath/core/chroma.py",
     "src/chromath/core/cycle.py",
-    "src/chromath/components",
+    "src/chromath/objects",
 ]
 typeCheckingMode = "standard"
 venvPath = "."

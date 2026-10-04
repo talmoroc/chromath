@@ -1,19 +1,12 @@
-"""The public classes built on chromath.core.
-
-`Cycle` is the entry point a person uses: it validates what it is given, holds
-a step and a starting chroma as a hashable value, adds indexing by rank, and
-hands the computation to `core.cycle`. What that computation must satisfy is
-tested on the core functions, in test_core.py and test_operations.py; here it
-only has to agree with them.
-"""
+"""The public classes built on chromath.core."""
 
 import numpy as np
 import pytest
 from conftest import BASED_IDS, BASES, SAMPLE_BASED, chroma_of, members_of, note_of, start_of, tones_of, turn
 
-from chromath.components.cycle_component import Cycle
 from chromath.constants import MS
 from chromath.core import chroma, cycle
+from chromath.objects.cycle_object import Cycle
 
 # ── construction ────────────────────────────────────────────────────────
 
@@ -30,8 +23,7 @@ def test_a_cycle_refuses_what_is_not_a_step_and_one_chroma_key():
 
 
 def test_a_cycle_is_a_hashable_value_with_one_spelling():
-    """Whatever form the start arrives in, it is kept as a ChromaKey, so cycles
-    hash, compare, and can sit in a set."""
+    """The start is stored as a ChromaKey, so cycles hash and compare."""
     major = start_of(0, "major")  # a 0-d array, as the core returns it
     d_major = chroma_of([2, 6, 9])
     assert Cycle(7) == Cycle(7, note_of(0))  # C unless told otherwise
@@ -59,7 +51,7 @@ def test_a_cycle_reports_what_the_core_computes(step, start, name):
 
 
 def test_cycle_methods_validate_the_chromas_they_are_given():
-    """A person calls these, so a raw value is parsed rather than trusted."""
+    """Raw values are parsed, not trusted."""
     fifths = Cycle(7)
     assert fifths.rank([1, 128, 4]).tolist() == [0, 1, 2]  # plain ints are keys: C, G, D
     assert fifths.dist(1, [128, 32]).tolist() == [1, 1]
@@ -90,7 +82,7 @@ def test_cycle_indexing(step, start, name):
 
 @pytest.mark.parametrize(("step", "start", "name"), SAMPLE_BASED, ids=BASED_IDS)
 def test_cycle_symmetric_indexing(step, start, name):
-    """`sym` is a sequence of pairs: entry d holds everything d steps from the start."""
+    """Entry d of `sym` holds everything d steps from the start."""
     c = Cycle(step, start_of(start, name))
     assert len(c.sym) == c.period // 2 + 1
     assert c.sym[:].shape == (len(c.sym), 2)

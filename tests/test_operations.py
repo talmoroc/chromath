@@ -1,9 +1,4 @@
-"""Operations relating one object to another.
-
-Transposition and inversion move a chroma; set measures and distances compare
-two of them; rank and dist locate chromas within a cycle. What the objects *are*
-lives in test_core.py.
-"""
+"""Operations relating one object to another."""
 
 from itertools import pairwise, product
 
@@ -104,12 +99,7 @@ def test_a_distance_is_invariant_under_transposition(d, a, b):
 
 
 def test_tversky_symm_trades_the_triangle_inequality_for_inclusion():
-    """Alpha above 0.5 makes inclusion cheap, and inclusion chains.
-
-    C and D are a full unit apart, but each is nearly included in {C, D}, so
-    the detour is cheaper than the direct route. At alpha 0.5 it is a metric
-    and belongs back in METRICS.
-    """
+    """Above alpha 0.5, symmetric Tversky is not a metric."""
     c, c_d, d_ = note_of(0), chroma_of([0, 2]), note_of(2)
     assert chroma.tversky_symm(c, d_) == 1.0
     assert chroma.tversky_symm(c, c_d) + chroma.tversky_symm(c_d, d_) < 1.0
@@ -129,12 +119,11 @@ def test_closest_ranks_candidates_by_distance():
 
 
 # ── locating a chroma in a cycle ────────────────────────────────────────
-# The core takes a cycle as the array of its members over one turn.
 
 
 @pytest.mark.parametrize(("step", "start", "name"), SAMPLE_BASED, ids=BASED_IDS)
 def test_cycle_rank(step, start, name):
-    """Ranks are signed, so `members[rank(x)] == x` whichever way it was reached."""
+    """Ranks are signed: `members[rank(x)] == x` either way."""
     members = turn(step, start, name)
     period = len(members)
     for r, member in enumerate(each(members)):
@@ -165,8 +154,7 @@ def test_cycle_rank_anchors():
 
 @pytest.mark.parametrize(("step", "start", "name"), SAMPLE_BASED, ids=BASED_IDS)
 def test_cycle_dist_is_a_metric_counting_steps(step, start, name):
-    """Steps between two members the short way round: walking that many steps
-    one way or the other from a lands on b, and it is never more than half a turn."""
+    """Steps between two members the short way round."""
     members = turn(step, start, name)
     inside = each(members)
 
