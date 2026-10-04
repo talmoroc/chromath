@@ -7,12 +7,12 @@ broadcasting and shape preservation together.
 
 import numpy as np
 import pytest
-from conftest import chroma_key_arrays, chromas, tones_of
+from conftest import chroma_key_arrays, chroma_of, chromas, each, foreign_to, note_of, turn
 from hypothesis import given
 
 from chromath.constants import MS
-from chromath.core import chroma
-from chromath.core.cycle import Cycle
+from chromath.core import chroma, cycle
+from chromath.types import DT
 
 #: (name, f) where f takes one key or an array of keys.
 UNARY = [
@@ -41,8 +41,8 @@ def test_a_unary_operation_is_elementwise(name, f, arr, grid):
     """f(array)[i] == f(array[i]), and the leading shape survives."""
     batched = f(arr)
     assert len(batched) == len(arr)
-    for got, key in zip(batched, arr, strict=True):
-        assert np.array_equal(got, f(np.uint16(key)))
+    for got, key in zip(batched, each(arr), strict=True):
+        assert np.array_equal(got, f(key))
     assert np.asarray(f(grid)).shape[: grid.ndim] == grid.shape
 
 
@@ -52,26 +52,51 @@ def test_a_binary_operation_is_elementwise(name, f, a, b, scalar):
     """Pairwise over equal lengths, broadcast against a scalar, table when nested."""
     n = min(len(a), len(b))
     for i in range(n):
-        assert np.array_equal(f(a[:n], b[:n])[i], f(np.uint16(a[i]), np.uint16(b[i])))
+        assert np.array_equal(f(a[:n], b[:n])[i], f(a[i, ...], b[i, ...]))
 
     right, left = f(a, scalar), f(scalar, a)
-    for i, key in enumerate(a):
-        assert np.array_equal(right[i], f(np.uint16(key), np.uint16(scalar)))
-        assert np.array_equal(left[i], f(np.uint16(scalar), np.uint16(key)))
+    for i, key in enumerate(each(a)):
+        assert np.array_equal(right[i], f(key, scalar))
+        assert np.array_equal(left[i], f(scalar, key))
 
     table = f(a[:, np.newaxis], b)
     assert table.shape == (len(a), len(b))
     for i in range(len(a)):
         for j in range(len(b)):
-            assert np.array_equal(table[i, j], f(np.uint16(a[i]), np.uint16(b[j])))
+            assert np.array_equal(table[i, j], f(a[i, ...], b[j, ...]))
 
 
 @pytest.mark.parametrize(("name", "f"), KEY_RETURNING, ids=[n for n, _ in KEY_RETURNING])
 @given(chroma_key_arrays())
 def test_an_operation_returning_keys_keeps_the_key_dtype(name, f, arr):
     """uint16 in, uint16 out — no silent promotion to int64."""
-    assert np.asarray(f(arr)).dtype == np.uint16
-    assert np.asarray(f(np.uint16(1))).dtype == np.uint16
+    assert f(arr).dtype == np.uint16
+    assert f(np.array(1, dtype=DT.Key)).dtype == np.uint16
+
+
+# ── one chroma is a 0-d array, never a NumPy scalar ─────────────────────
+
+ONE = [*UNARY, ("from_vector", lambda c: chroma.from_vector(chroma.to_vector(c)))]
+
+
+@pytest.mark.parametrize(("name", "f"), ONE, ids=[n for n, _ in ONE])
+@given(chromas)
+def test_a_unary_operation_on_one_chroma_returns_an_array(name, f, c):
+    """NumPy demotes 0-d results to scalars; the library must not pass that on."""
+    assert isinstance(c, np.ndarray) and c.ndim == 0
+    assert isinstance(f(c), np.ndarray)
+
+
+@pytest.mark.parametrize(("name", "f"), BINARY, ids=[n for n, _ in BINARY])
+@given(chromas, chromas)
+def test_a_binary_operation_on_two_chromas_returns_a_0d_array(name, f, a, b):
+    got = f(a, b)
+    assert isinstance(got, np.ndarray) and got.ndim == 0
+
+
+def test_parsing_and_generation_return_arrays():
+    for got in (chroma.validate_chroma_keys(5), chroma_of([0, 4, 7]), note_of(3), chroma_of([])):
+        assert isinstance(got, np.ndarray) and got.ndim == 0 and got.dtype == DT.Key
 
 
 @given(chroma_key_arrays(), chroma_key_arrays(shape2d=True))
@@ -82,119 +107,57 @@ def test_conversion_round_trips_over_a_batch(arr, grid):
     assert np.array_equal(chroma.from_vector(chroma.to_vector(grid)), grid)
 
 
-def test_to_st_rejects_a_batch():
-    """Semitone lists are ragged, so to_st takes one chroma and says so."""
-    with pytest.raises(ValueError):
-        chroma.to_st(np.array([chroma.from_st(0, 4, 7), chroma.from_st(0, 3, 7)]))
+# ── cycle functions ─────────────────────────────────────────────────────
+
+#: Cycles with a period of at least four, so a batch can be reshaped. Bare
+#: notes and chords alike, since what a cycle starts on changes nothing about batching.
+CYCLES = [(7, 0, "unison"), (3, 9, "unison"), (7, 0, "major"), (3, 9, "dom7")]
+CYCLE_IDS = ["step7", "step3_from9", "step7_major", "step3_from9_dom7"]
 
 
-# ── cycle methods ───────────────────────────────────────────────────────
-
-#: Cycles with a period of at least four, so a batch can be reshaped.
-CYCLES = [Cycle(7), Cycle(3, 9), Cycle(1, 11)]
-CYCLE_IDS = [f"step{c.step}_from{c.start}" for c in CYCLES]
-
-
-EMPTY = np.array([], dtype=np.int8)
+@pytest.fixture(params=CYCLES, ids=CYCLE_IDS)
+def members(request):
+    """One turn of a cycle: what every core cycle function takes."""
+    return turn(*request.param)
 
 
-@pytest.mark.parametrize("c", CYCLES, ids=CYCLE_IDS)
 @pytest.mark.parametrize("direction", ["forward", "backward", "min"])
-def test_cycle_rank_is_elementwise(c, direction):
+def test_cycle_rank_is_elementwise(members, direction):
     """rank(array)[i] == rank(array[i]), whatever shape the array is."""
-    tones = np.array(sorted(tones_of(c.mask)))
-    one_by_one = [int(c.rank(int(t), direction)) for t in tones]
-
-    batched = np.asarray(c.rank(tones, direction))
-    assert batched.shape == tones.shape
-    assert batched.tolist() == one_by_one
-
-    grid = tones[:4].reshape(2, 2)
-    assert np.asarray(c.rank(grid, direction)).tolist() == [[int(c.rank(int(t), direction)) for t in row] for row in grid]
-
-    cube = np.stack([grid, grid])
-    assert np.asarray(c.rank(cube, direction)).shape == cube.shape
+    grid = members[:4].reshape(2, 2)
+    assert cycle.rank(members, members, direction).tolist() == [int(cycle.rank(members, x, direction)) for x in each(members)]
+    assert cycle.rank(members, grid, direction).tolist() == [[int(cycle.rank(members, x, direction)) for x in each(row)] for row in grid]
+    assert cycle.rank(members, members[:0], direction).shape == (0,)
 
 
-@pytest.mark.parametrize("c", CYCLES, ids=CYCLE_IDS)
-def test_cycle_rank_keeps_scalars_scalar(c):
-    """A lone semitone is not silently promoted to a one-element array."""
-    tone = sorted(tones_of(c.mask))[0]
-    assert np.ndim(c.rank(tone)) == 0
-    assert np.asarray(c.rank(EMPTY)).shape == (0,)
+def test_cycle_dist_is_elementwise_and_broadcasts(members):
+    """Pairwise over matching shapes, a lone chroma against an array, a column against a row."""
+    a, b = members[:4], members[-4:]
+    lone = members[0, ...]
 
+    assert cycle.dist(members, a, b).tolist() == [int(cycle.dist(members, x, y)) for x, y in zip(each(a), each(b), strict=True)]
+    assert cycle.dist(members, lone, b).tolist() == [int(cycle.dist(members, lone, y)) for y in each(b)]
 
-@pytest.mark.parametrize("c", CYCLES, ids=CYCLE_IDS)
-def test_cycle_dist_is_elementwise(c):
-    """Pairwise over matching shapes, and still symmetric entry by entry."""
-    tones = np.array(sorted(tones_of(c.mask)))
-    a, b = tones[:4], tones[-4:]
-
-    paired = np.asarray(c.dist(a, b))
-    assert paired.shape == a.shape
-    assert paired.tolist() == [int(c.dist(int(x), int(y))) for x, y in zip(a, b, strict=True)]
-    assert np.array_equal(paired, np.asarray(c.dist(b, a)))
-
-    assert np.asarray(c.dist(a.reshape(2, 2), b.reshape(2, 2))).tolist() == paired.reshape(2, 2).tolist()
-    assert np.asarray(c.dist(EMPTY, EMPTY)).shape == (0,)
-
-
-@pytest.mark.parametrize("c", CYCLES, ids=CYCLE_IDS)
-def test_cycle_dist_broadcasts(c):
-    """A lone semitone against an array, and a column against a row for every pair."""
-    tones = np.array(sorted(tones_of(c.mask)))
-    a, b = tones[:4], tones[-4:]
-    lone = int(tones[0])
-
-    assert np.asarray(c.dist(lone, b)).tolist() == [int(c.dist(lone, int(y))) for y in b]
-    assert np.asarray(c.dist(a, lone)).tolist() == [int(c.dist(int(x), lone)) for x in a]
-    assert np.ndim(c.dist(lone, lone)) == 0
-
-    table = np.asarray(c.dist(a[:, np.newaxis], b))
+    table = cycle.dist(members, a[:, np.newaxis], b)
     assert table.shape == (len(a), len(b))
-    for i, x in enumerate(a):
-        for j, y in enumerate(b):
-            assert table[i, j] == c.dist(int(x), int(y))
-
-    assert np.asarray(c.dist(tones[:3, np.newaxis], tones[:2])).shape == (3, 2)
+    assert all(table[i, j] == cycle.dist(members, x, y) for i, x in enumerate(each(a)) for j, y in enumerate(each(b)))
 
 
-@pytest.mark.parametrize("c", CYCLES, ids=CYCLE_IDS)
-def test_batched_ranks_and_distances_obey_the_scalar_bounds(c):
-    """The laws hold over a whole table at once, not only one pair at a time."""
-    tones = np.array(sorted(tones_of(c.mask)))
-    table = np.asarray(c.dist(tones[:, np.newaxis], tones))
-    assert np.array_equal(table, table.T)
-    assert np.array_equal(np.diagonal(table), np.zeros(len(tones)))
-    assert table.min() == 0
-    assert table.max() <= c.period // 2
-
-    forward = np.asarray(c.rank(tones, "forward"))
-    backward = np.asarray(c.rank(tones, "backward"))
-    assert ((forward >= 0) & (forward < c.period)).all()
-    assert ((backward > -c.period) & (backward <= 0)).all()
-    assert sorted(forward.tolist()) == list(range(c.period))
+def test_cycle_functions_on_one_chroma_return_a_0d_array(members):
+    """One chroma in, one 0-d array out: neither a NumPy scalar nor a one-element array."""
+    one = members[0, ...]
+    for got in (cycle.mask(members), cycle.rank(members, one), cycle.dist(members, one, one)):
+        assert isinstance(got, np.ndarray) and got.ndim == 0
 
 
-def test_a_batch_holding_a_tone_outside_the_cycle_raises():
+def test_a_batch_holding_a_chroma_outside_the_cycle_raises(members):
     """One bad entry fails the call rather than returning a sentinel."""
-    dim = Cycle(3)  # {0, 3, 6, 9}
-    inside, outside = 0, 1
+    inside, outside = members[0, ...], foreign_to(members[0, ...])
+    mixed = np.array([inside, outside], dtype=DT.Key)
 
     with pytest.raises(IndexError):
-        dim.rank(outside)
+        cycle.rank(members, mixed)
     with pytest.raises(IndexError):
-        dim.rank(np.array([inside, outside]))
+        cycle.dist(members, members[:2], mixed)
     with pytest.raises(IndexError):
-        dim.rank(np.array([[inside, inside], [inside, outside]]))
-
-    with pytest.raises(IndexError):
-        dim.dist(inside, outside)
-    with pytest.raises(IndexError):
-        dim.dist(outside, inside)
-    with pytest.raises(IndexError):
-        dim.dist(np.array([inside, inside]), np.array([3, outside]))
-    with pytest.raises(IndexError):
-        dim.dist(np.array([inside, outside]), np.array([3, 3]))
-    with pytest.raises(IndexError):
-        dim.dist(np.array([inside, outside])[:, np.newaxis], np.array([3, 6]))
+        cycle.dist(members, mixed[:, np.newaxis], members[:2])

@@ -108,13 +108,13 @@ _CATEGORIES = (
 )
 
 
-def _to_key(vector: list[int]) -> np.uint16:
+def _to_key(vector: list[int]) -> np.ndarray:
     """Little-endian 12-bit key, built here rather than via chromath.
 
     An independent oracle: the suite must not check the library against
     itself.
     """
-    return np.uint16(sum(bit << i for i, bit in enumerate(vector)))
+    return np.array(sum(bit << i for i, bit in enumerate(vector)), dtype=np.uint16)
 
 
 def _namespace(convert) -> SimpleNamespace:
