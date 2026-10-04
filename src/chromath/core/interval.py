@@ -8,14 +8,15 @@ import numpy as np
 from ..constants import DefaultMusicSystem as MS
 from ..types import (
     DT,
-    InterpretedIntervalArray,
+    SENTINEL,
+    DegreeArray,
+    InterpretedDegreeArray,
     ScaleLookupArray,
     ScaleLookupCounts,
-    SemitonesArray,
 )
 
 
-def to_int(v: SemitonesArray) -> int:
+def to_int(v: DegreeArray) -> int:
     """
     Converts an IntervalArray to its bitwise integer representation based on semitones.
     """
@@ -25,7 +26,7 @@ def to_int(v: SemitonesArray) -> int:
     return int(np.dot(chroma, MS.powers))
 
 
-def from_bits(bitwise_repr: int) -> SemitonesArray:
+def from_bits(bitwise_repr: int) -> DegreeArray:
     """
     Reconstructs an IntervalArray from a bitwise integer representation.
     Note: Degrees are set to 0 as they cannot be inferred from bits alone.
@@ -34,19 +35,19 @@ def from_bits(bitwise_repr: int) -> SemitonesArray:
         raise ValueError(f"Bits should be < 2**{MS.tones}, got {bitwise_repr}")
 
     semitones = np.where((bitwise_repr >> np.arange(MS.tones)) & 1)[0]
-    res = np.zeros((len(semitones), 2), dtype=DT.St)
+    res = np.zeros((len(semitones), 2), dtype=DT.Note)
     res[:, 1] = semitones
     return res
 
 
-def isin(v: SemitonesArray, e: SemitonesArray) -> bool:
+def isin(v: DegreeArray, e: DegreeArray) -> bool:
     """
     Checks if a specific interval [degree, semitone] exists within a collection of intervals.
     """
     return bool(np.any(np.all(e == v, axis=-1)))
 
 
-def shift(v: SemitonesArray, n: int) -> SemitonesArray:
+def shift(v: DegreeArray, n: int) -> DegreeArray:
     """
     Transposes the interval(s) by n semitones.
     """
@@ -55,7 +56,7 @@ def shift(v: SemitonesArray, n: int) -> SemitonesArray:
     return res
 
 
-def from_scale(scale_semitones: list[int] | np.ndarray) -> SemitonesArray:
+def from_scale(scale_semitones: list[int] | np.ndarray) -> DegreeArray:
     """
     Converts a scale (list of semitones) to a IntervalArray.
     Each interval is represented as (degree, semitone).
@@ -64,25 +65,25 @@ def from_scale(scale_semitones: list[int] | np.ndarray) -> SemitonesArray:
     if len(scale_semitones) != MS.degrees:
         raise ValueError(f"Scale must have {MS.degrees} degrees, got {len(scale_semitones)}")
 
-    degrees = np.arange(1, MS.degrees + 1, dtype=DT.St)
-    semitones = np.array(scale_semitones, dtype=DT.St)
+    degrees = np.arange(1, MS.degrees + 1, dtype=DT.Note)
+    semitones = np.array(scale_semitones, dtype=DT.Note)
     res = np.column_stack((degrees, semitones))
     return res
 
 
-def from_chord(chord_semitones: list[int] | np.ndarray) -> SemitonesArray:
+def from_chord(chord_semitones: list[int] | np.ndarray) -> DegreeArray:
     """
     Converts a chord (list of semitones relative to root) to an IntervalArray.
     Degrees are inferred from sorted position in the chord.
     """
-    semitones = np.array(chord_semitones, dtype=DT.St)
+    semitones = np.array(chord_semitones, dtype=DT.Note)
     semitones = np.sort(semitones)
-    degrees = np.arange(len(semitones), dtype=DT.St)
+    degrees = np.arange(len(semitones), dtype=DT.Note)
     res = np.column_stack((degrees, semitones))
     return res
 
 
-def semitone_distance(interval1: SemitonesArray, interval2: SemitonesArray) -> int:
+def semitone_distance(interval1: DegreeArray, interval2: DegreeArray) -> int:
     """
     Computes the semitone distance between two intervals.
     Returns the absolute difference in semitones.
@@ -97,8 +98,8 @@ def scale_distance(scale1_semitones: list[int] | np.ndarray, scale2_semitones: l
     Computes the total semitone distance between two scales.
     Returns the sum of absolute differences for each degree.
     """
-    scale1 = np.array(scale1_semitones, dtype=DT.St)
-    scale2 = np.array(scale2_semitones, dtype=DT.St)
+    scale1 = np.array(scale1_semitones, dtype=DT.Note)
+    scale2 = np.array(scale2_semitones, dtype=DT.Note)
 
     if len(scale1) != len(scale2):
         raise ValueError(f"Scales must have same length, got {len(scale1)} and {len(scale2)}")
@@ -106,7 +107,7 @@ def scale_distance(scale1_semitones: list[int] | np.ndarray, scale2_semitones: l
     return int(np.sum(np.abs((scale2 - scale1) % MS.tones)))
 
 
-def common_intervals(interval_array1: SemitonesArray, interval_array2: SemitonesArray) -> SemitonesArray:
+def common_intervals(interval_array1: DegreeArray, interval_array2: DegreeArray) -> DegreeArray:
     """
     Finds intervals that appear in both arrays (by semitone value).
     """
@@ -114,12 +115,12 @@ def common_intervals(interval_array1: SemitonesArray, interval_array2: Semitones
     st2 = interval_array2[..., 1]
 
     common_st = np.intersect1d(st1, st2)
-    degrees = np.arange(len(common_st), dtype=DT.St)
+    degrees = np.arange(len(common_st), dtype=DT.Note)
     res = np.column_stack((degrees, common_st))
     return res
 
 
-def invert(v: SemitonesArray, pivot: int = 0) -> SemitonesArray:
+def invert(v: DegreeArray, pivot: int = 0) -> DegreeArray:
     """
     Musical inversion of intervals around a pivot (default 0 semitones).
     """
@@ -131,7 +132,6 @@ def invert(v: SemitonesArray, pivot: int = 0) -> SemitonesArray:
 # ── Scale Lookup & Interpretation ──────────────────────────────────────
 
 
-_SENTINEL = np.int8(np.iinfo(np.int8).min)  # -128, must not collide with valid alt values
 
 
 def build_scale_lookup(
@@ -147,15 +147,15 @@ def build_scale_lookup(
     Returns:
         lookup : int8 array, shape (12, 2, 2).
             lookup[st, k] = (degree, alteration) for the k-th interpretation.
-            Unused slots are filled with _SENTINEL.
+            Unused slots are filled with SENTINEL.
         counts : int8 array, shape (12,).
             Number of valid interpretations per semitone (1 or 2).
     """
-    sc = np.sort(np.asarray(scale_semitones, dtype=DT.St))
+    sc = np.sort(np.asarray(scale_semitones, dtype=DT.Note))
     n_deg = len(sc)
 
-    lookup = np.full((MS.tones, 2, 2), _SENTINEL, dtype=DT.St)
-    counts = np.zeros(MS.tones, dtype=DT.St)
+    lookup = np.full((MS.tones, 2, 2), SENTINEL, dtype=DT.Note)
+    counts = np.zeros(MS.tones, dtype=DT.Note)
 
     sc_set = set(int(s) for s in sc)
 
@@ -203,9 +203,9 @@ def build_all_scale_lookups(
         lookups : int8 array, shape (12, 12, 2, 2)
         counts  : int8 array, shape (12, 12)
     """
-    sc = np.asarray(scale_semitones, dtype=DT.St)
-    all_lookups = np.empty((MS.tones, MS.tones, 2, 2), dtype=DT.St)
-    all_counts = np.empty((MS.tones, MS.tones), dtype=DT.St)
+    sc = np.asarray(scale_semitones, dtype=DT.Note)
+    all_lookups = np.empty((MS.tones, MS.tones, 2, 2), dtype=DT.Note)
+    all_counts = np.empty((MS.tones, MS.tones), dtype=DT.Note)
     for root in range(MS.tones):
         transposed = (sc + root) % MS.tones
         lk, ct = build_scale_lookup(np.sort(transposed))
@@ -223,13 +223,13 @@ def _cof_distance(a: int, b: int) -> int:
 def _interpret_single_lookup(
     chord_semitones: np.ndarray,
     lookup: ScaleLookupArray,
-) -> InterpretedIntervalArray:
+) -> InterpretedDegreeArray:
     """Fast-path: take slot-0 interpretation from a single lookup.
 
     Used internally by the solver for per-scale scoring.
     Sentinel values are passed through unchanged.
     """
-    st = np.asarray(chord_semitones, dtype=DT.St)
+    st = np.asarray(chord_semitones, dtype=DT.Note)
     original_shape = st.shape
 
     mask = st >= 0
@@ -237,10 +237,10 @@ def _interpret_single_lookup(
 
     deg_alt = lookup[safe_st, 0]
 
-    result = np.full((*original_shape, 3), _SENTINEL, dtype=DT.St)
-    result[..., 0] = np.where(mask, deg_alt[..., 0], _SENTINEL)
-    result[..., 1] = np.where(mask, st, _SENTINEL)
-    result[..., 2] = np.where(mask, deg_alt[..., 1], _SENTINEL)
+    result = np.full((*original_shape, 3), SENTINEL, dtype=DT.Note)
+    result[..., 0] = np.where(mask, deg_alt[..., 0], SENTINEL)
+    result[..., 1] = np.where(mask, st, SENTINEL)
+    result[..., 2] = np.where(mask, deg_alt[..., 1], SENTINEL)
 
     return result
 
@@ -250,7 +250,7 @@ def interpret_canonical(
     scale_semitones_list: list[np.ndarray],
     reference_roots: int | list[int] = 0,
     distance_fn: Callable[[int, int], float] | None = None,
-) -> InterpretedIntervalArray:
+) -> InterpretedDegreeArray:
     """Tonality-aware canonical interpretation.
 
     For each chromatic note in the chord, all 12 transpositions of every
@@ -290,7 +290,7 @@ def interpret_canonical(
     # Normalise to list
     ref_list = [int(reference_roots)] if isinstance(reference_roots, (int, np.integer)) else [int(r) for r in reference_roots]
 
-    st = np.asarray(chord_semitones, dtype=DT.St).ravel()
+    st = np.asarray(chord_semitones, dtype=DT.Note).ravel()
     n_notes = len(st)
 
     # Build all lookups
@@ -359,7 +359,7 @@ def interpret_canonical(
     use_sharp = sharp_weight > flat_weight
 
     # Build result using original (root=0) degrees and the chosen spelling
-    result = np.full((n_notes, 3), _SENTINEL, dtype=DT.St)
+    result = np.full((n_notes, 3), SENTINEL, dtype=DT.Note)
     for ni in range(n_notes):
         s = int(st[ni])
         if s < 0:
@@ -397,7 +397,7 @@ def interpret_all(
     chord_semitones: np.ndarray,
     lookup: ScaleLookupArray,
     counts: ScaleLookupCounts,
-) -> list[InterpretedIntervalArray]:
+) -> list[InterpretedDegreeArray]:
     """
     Rich-path interpretation: enumerate all valid interpretation combinations for
     a chord. Only used for analysis of specific candidates.
@@ -410,7 +410,7 @@ def interpret_all(
     Returns:
         List of InterpretedIntervalArray, each shape (n_notes, 3).
     """
-    st = np.asarray(chord_semitones, dtype=DT.St).ravel()
+    st = np.asarray(chord_semitones, dtype=DT.Note).ravel()
     valid = st >= 0
     active_st = st[valid]
 
@@ -421,9 +421,9 @@ def interpret_all(
         options = [(int(lookup[s, k, 0]), int(lookup[s, k, 1])) for k in range(n)]
         per_note_options.append(options)
 
-    results: list[InterpretedIntervalArray] = []
+    results: list[InterpretedDegreeArray] = []
     for combo in cartesian_product(*per_note_options):
-        interp = np.full((len(st), 3), _SENTINEL, dtype=DT.St)
+        interp = np.full((len(st), 3), SENTINEL, dtype=DT.Note)
         for i, (idx, s) in enumerate(zip(np.where(valid)[0], active_st, strict=True)):
             deg, alt = combo[i]
             interp[idx] = (deg, s, alt)
@@ -432,18 +432,18 @@ def interpret_all(
     return results
 
 
-def alteration_cost(interpreted: InterpretedIntervalArray) -> int:
+def alteration_cost(interpreted: InterpretedDegreeArray) -> int:
     """
     Sum of |alteration| across all notes. Sentinel values are ignored.
     """
     alt = interpreted[..., 2]
-    mask = alt != _SENTINEL
+    mask = alt != SENTINEL
     return int(np.sum(np.abs(alt[mask])))
 
 
 def resolution_score(
-    interpreted_from: InterpretedIntervalArray,
-    interpreted_to: InterpretedIntervalArray,
+    interpreted_from: InterpretedDegreeArray,
+    interpreted_to: InterpretedDegreeArray,
 ) -> float:
     """
     Score how well alterations in `interpreted_from` resolve into `interpreted_to`.
@@ -458,7 +458,7 @@ def resolution_score(
     from_st = interpreted_from[..., 1].ravel()
     to_st = interpreted_to[..., 1].ravel()
 
-    mask = (from_alt != _SENTINEL) & (from_alt != 0)
+    mask = (from_alt != SENTINEL) & (from_alt != 0)
     if not np.any(mask):
         return 1.0  # no alterations to resolve
 

@@ -27,12 +27,9 @@ import numpy as np
 from scipy.special import logsumexp as _scipy_logsumexp
 
 from ..constants import DefaultMusicSystem as MS
-from ..types import DT, ChromaBoolArray
+from ..types import DT, SENTINEL, ChromaVec
 from . import freq_ops
 from . import interval as interval
-
-_SENTINEL = np.int8(np.iinfo(np.int8).min)  # -128
-
 
 # ---------------------------------------------------------------------------
 # Types
@@ -111,7 +108,7 @@ def batch_alteration_cost(interpretations: np.ndarray) -> np.ndarray:
         int array, shape ``(...)``.
     """
     alt = interpretations[..., 2]
-    mask = alt != _SENTINEL
+    mask = alt != SENTINEL
     return np.sum(np.abs(alt) * mask, axis=-1)
 
 
@@ -131,10 +128,10 @@ def batch_resolution_score(
     from_st = interp_from[..., 1].astype(np.int16)
     to_st = interp_to[..., 1].astype(np.int16)
 
-    has_alt = (from_alt != _SENTINEL) & (from_alt != 0)
+    has_alt = (from_alt != SENTINEL) & (from_alt != 0)
     n_altered = has_alt.sum(axis=-1).astype(np.float64)
 
-    to_valid_mask = interp_to[..., 1] != _SENTINEL
+    to_valid_mask = interp_to[..., 1] != SENTINEL
 
     diff = to_st[..., np.newaxis, :] - from_st[..., :, np.newaxis]
     diff = diff % MS.tones
@@ -166,8 +163,8 @@ def batch_voice_leading_cost(
     f = from_st.astype(np.int16)
     t = to_st.astype(np.int16)
 
-    f_valid = from_st != _SENTINEL
-    t_valid = to_st != _SENTINEL
+    f_valid = from_st != SENTINEL
+    t_valid = to_st != SENTINEL
 
     diff = t[..., np.newaxis, :] - f[..., :, np.newaxis]
     diff = diff % MS.tones
@@ -214,7 +211,7 @@ _TRIAD_PATTERNS = np.array(
 )
 
 
-def batch_tertian_score(chromas: ChromaBoolArray) -> np.ndarray:
+def batch_tertian_score(chromas: ChromaVec) -> np.ndarray:
     """Check whether each chord contains a standard triad.
 
     Returns:
@@ -276,10 +273,10 @@ def _tertian_chain(candidate: int, notes: set[int], max_gaps: int = 1) -> tuple[
     return len(covered), len(visited)
 
 
-def estimate_roots(chromas: ChromaBoolArray) -> np.ndarray:
+def estimate_roots(chromas: ChromaVec) -> np.ndarray:
     """Estimate the most likely root pitch-class for each chord."""
     n = chromas.shape[0]
-    roots = np.zeros(n, dtype=DT.St)
+    roots = np.zeros(n, dtype=DT.Note)
 
     for i in range(n):
         notes = set(np.flatnonzero(chromas[i]).tolist())
@@ -317,7 +314,7 @@ def root_position_semitones(semitones: list[int], root: int) -> list[int]:
 
 
 def batch_dissonance(
-    chromas: ChromaBoolArray,
+    chromas: ChromaVec,
     roots: np.ndarray | None = None,
     method: str = "smoothed",
 ) -> np.ndarray:

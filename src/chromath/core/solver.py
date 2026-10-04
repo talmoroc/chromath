@@ -4,12 +4,12 @@ import numpy as np
 import pandas as pd
 
 from ..constants import DefaultMusicSystem as MS
-from ..types import DT, ChromaBoolArray, ScaleLookupArray
+from ..types import DT, SENTINEL, ChromaVec, ScaleLookupArray
+from . import chroma
 from . import interval as interval
 
 #  from . import conversion as conv
 from .scores import (  # noqa: F401
-    _SENTINEL,
     _TRIAD_PATTERNS,
     AGGREGATION_METHODS,
     DEFAULT_SCORE_FNS,
@@ -64,7 +64,7 @@ def compute_tonality_weights(
     return weights
 
 
-def generate_all_chromas(min_notes: int = 2, max_notes: int = 7) -> ChromaBoolArray:
+def generate_all_chromas(min_notes: int = 2, max_notes: int = 7) -> ChromaVec:
     """
     Generate all binary subsets of {0..11} with cardinality in [min_notes, max_notes].
 
@@ -74,29 +74,10 @@ def generate_all_chromas(min_notes: int = 2, max_notes: int = 7) -> ChromaBoolAr
     rows: list[np.ndarray] = []
     for k in range(min_notes, max_notes + 1):
         for combo in combinations(range(MS.tones), k):
-            row = np.zeros(MS.tones, dtype=DT.Chroma)
+            row = np.zeros(MS.tones, dtype=DT.Bool)
             row[list(combo)] = True
             rows.append(row)
-    return np.array(rows, dtype=DT.Chroma)
-
-
-def chromas_to_padded_semitones(chromas: ChromaBoolArray, max_notes: int = 7) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Convert a batch of chroma vectors to padded semitone arrays.
-
-    Returns:
-        semitones: int8 array, shape (n, max_notes). Padded with _SENTINEL.
-        lengths:   int8 array, shape (n,). Actual number of notes.
-    """
-    n = chromas.shape[0]
-    semitones = np.full((n, max_notes), _SENTINEL, dtype=DT.St)
-    lengths = chromas.sum(axis=-1).astype(DT.St)
-
-    for i in range(n):
-        st = np.flatnonzero(chromas[i]).astype(DT.St)
-        semitones[i, : len(st)] = st
-
-    return semitones, lengths
+    return np.array(rows, dtype=DT.Bool)
 
 
 def batch_interpret_canonical(
@@ -113,27 +94,28 @@ def batch_interpret_canonical(
     Returns:
         int8 array, shape (n_scales, n_candidates, max_notes, 3): (degree, semitone, alteration).
     """
+    lookups = np.asarray(lookups)
     n_scales = lookups.shape[0]
     n_cand, max_notes = candidate_semitones.shape
 
-    mask = candidate_semitones != _SENTINEL  # (n_cand, max_notes)
+    mask = candidate_semitones != SENTINEL  # (n_cand, max_notes)
     safe_st = np.where(mask, candidate_semitones, 0)  # safe for indexing
 
     # lookups[s, safe_st] → (n_scales, n_cand, max_notes, 2)  [degree, alteration]
     # We use advanced indexing: lookups[:, safe_st, 0] with broadcasting
     deg_alt = lookups[:, safe_st, 0]  # (n_scales, n_cand, max_notes, 2)
 
-    result = np.full((n_scales, n_cand, max_notes, 3), _SENTINEL, dtype=DT.St)
+    result = np.full((n_scales, n_cand, max_notes, 3), SENTINEL, dtype=DT.Note)
 
     mask_bc = mask[np.newaxis, ...]  # (1, n_cand, max_notes)
 
-    result[..., 0] = np.where(mask_bc, deg_alt[..., 0], _SENTINEL)  # degree
+    result[..., 0] = np.where(mask_bc, deg_alt[..., 0], SENTINEL)  # degree
     result[..., 1] = np.where(
         mask_bc,
         candidate_semitones[np.newaxis, ...],
-        _SENTINEL,
+        SENTINEL,
     )  # semitone
-    result[..., 2] = np.where(mask_bc, deg_alt[..., 1], _SENTINEL)  # alteration
+    result[..., 2] = np.where(mask_bc, deg_alt[..., 1], SENTINEL)  # alteration
 
     return result
 
@@ -239,9 +221,9 @@ def score_candidate_breakdown(
         candidate_semitones=candidate_semitones[candidate_idx : candidate_idx + 1],
         start_semitones=start_semitones,
         end_semitones=end_semitones,
-        candidate_lengths=np.array([candidate_length], dtype=DT.St),
+        candidate_lengths=np.array([candidate_length], dtype=DT.Note),
         candidate_dissonance=np.array([candidate_dissonance], dtype=np.float64),
-        candidate_roots=np.array([candidate_root], dtype=DT.St),
+        candidate_roots=np.array([candidate_root], dtype=DT.Note),
         candidate_tertian=np.array([candidate_tertian], dtype=np.float64),
         start_root=start_root,
         end_root=end_root,
@@ -326,8 +308,8 @@ def results_to_dataframe(result: dict, top_n: int | None = None) -> pd.DataFrame
 
 
 def solve(
-    start_chroma: ChromaBoolArray,
-    end_chroma: ChromaBoolArray,
+    start_chroma: ChromaVec,
+    end_chroma: ChromaVec,
     scale_semitones: list[np.ndarray],
     min_notes: int = 2,
     max_notes: int = 7,
@@ -388,19 +370,13 @@ def solve(
 
     # Generate candidates
     candidates = generate_all_chromas(min_notes, max_notes)
-    cand_st, cand_len = chromas_to_padded_semitones(candidates, max_notes)
+    cand_keys = chroma.from_vector(candidates)
+    cand_st = chroma.to_members(cand_keys)
+    cand_len = chroma.cardinality(cand_keys).astype(DT.Note)
 
     # Interpret start and end
-    start_st = np.flatnonzero(start_chroma).astype(DT.St)
-    end_st = np.flatnonzero(end_chroma).astype(DT.St)
-
-    def _pad(st: np.ndarray) -> np.ndarray:
-        padded = np.full(max_notes, _SENTINEL, dtype=DT.St)
-        padded[: len(st)] = st
-        return padded
-
-    start_padded = _pad(start_st)[np.newaxis, :]
-    end_padded = _pad(end_st)[np.newaxis, :]
+    start_padded = chroma.to_members(chroma.from_vector(start_chroma))[np.newaxis, :]
+    end_padded = chroma.to_members(chroma.from_vector(end_chroma))[np.newaxis, :]
 
     # Estimate roots
     cand_roots = estimate_roots(candidates)
