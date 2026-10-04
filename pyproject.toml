@@ -8,11 +8,10 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "beartype>=0.22.9",
-    "jaxtyping>=0.3.11",
     "matplotlib>=3.10.8",
     "numpy>=2.4.1",
     "pandas>=2.2.0",
+    "pytest-cov>=7.1.0",
     "scipy>=1.17.0",
 ]
 
@@ -31,10 +30,12 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "beartype>=0.22.9",
     "hypothesis>=6.168.0",
     "ipykernel>=7.1.0",
     "ipython>=9.9.0",
     "jupyter>=1.1.1",
+    "pyright>=1.1.414",
     "pytest>=9.0.2",
     "pytest-watcher>=0.6.3",
     "ruff>=0.14.14",
@@ -45,6 +46,18 @@ line-length = 150
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "I", "UP", "SIM", "NPY", "RUF"]
+
+[tool.pyright]
+# Only the modules already refactored to the typed core; add the others as they are.
+include = [
+    "src/chromath/types.py",
+    "src/chromath/core/chroma.py",
+    "src/chromath/core/cycle.py",
+    "src/chromath/components",
+]
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
