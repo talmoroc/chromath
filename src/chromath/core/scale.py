@@ -4,16 +4,19 @@ from collections.abc import Callable
 from itertools import product as cartesian_product
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from ..constants import DefaultMusicSystem as MS
 from ..types import (
     DT,
     SENTINEL,
+    ChromaKeyArray,
     DegreeArray,
     InterpretedDegreeArray,
     ScaleLookupArray,
     ScaleLookupCounts,
 )
+from . import chroma
 
 
 def to_int(v: DegreeArray) -> int:
@@ -27,10 +30,7 @@ def to_int(v: DegreeArray) -> int:
 
 
 def from_bits(bitwise_repr: int) -> DegreeArray:
-    """
-    Reconstructs an IntervalArray from a bitwise integer representation.
-    Note: Degrees are set to 0 as they cannot be inferred from bits alone.
-    """
+    """IntervalArray from a bitwise integer. Degrees are set to 0."""
     if bitwise_repr >= MS.max_int_repr:
         raise ValueError(f"Bits should be < 2**{MS.tones}, got {bitwise_repr}")
 
@@ -57,11 +57,7 @@ def shift(v: DegreeArray, n: int) -> DegreeArray:
 
 
 def from_scale(scale_semitones: list[int] | np.ndarray) -> DegreeArray:
-    """
-    Converts a scale (list of semitones) to a IntervalArray.
-    Each interval is represented as (degree, semitone).
-    Degrees are 1-indexed (1 through 7 for heptatonic scales).
-    """
+    """Scale semitones -> IntervalArray of (degree, semitone), degrees 1-indexed."""
     if len(scale_semitones) != MS.degrees:
         raise ValueError(f"Scale must have {MS.degrees} degrees, got {len(scale_semitones)}")
 
@@ -72,10 +68,7 @@ def from_scale(scale_semitones: list[int] | np.ndarray) -> DegreeArray:
 
 
 def from_chord(chord_semitones: list[int] | np.ndarray) -> DegreeArray:
-    """
-    Converts a chord (list of semitones relative to root) to an IntervalArray.
-    Degrees are inferred from sorted position in the chord.
-    """
+    """Chord semitones -> IntervalArray, degrees inferred from sorted position."""
     semitones = np.array(chord_semitones, dtype=DT.Note)
     semitones = np.sort(semitones)
     degrees = np.arange(len(semitones), dtype=DT.Note)
@@ -84,20 +77,14 @@ def from_chord(chord_semitones: list[int] | np.ndarray) -> DegreeArray:
 
 
 def semitone_distance(interval1: DegreeArray, interval2: DegreeArray) -> int:
-    """
-    Computes the semitone distance between two intervals.
-    Returns the absolute difference in semitones.
-    """
+    """Absolute semitone difference between two intervals."""
     st1 = np.atleast_1d(interval1)[..., 1]
     st2 = np.atleast_1d(interval2)[..., 1]
     return int(np.abs(st2 - st1) % MS.tones)
 
 
 def scale_distance(scale1_semitones: list[int] | np.ndarray, scale2_semitones: list[int] | np.ndarray) -> int:
-    """
-    Computes the total semitone distance between two scales.
-    Returns the sum of absolute differences for each degree.
-    """
+    """Sum of absolute semitone differences per degree between two scales."""
     scale1 = np.array(scale1_semitones, dtype=DT.Note)
     scale2 = np.array(scale2_semitones, dtype=DT.Note)
 
@@ -137,20 +124,7 @@ def invert(v: DegreeArray, pivot: int = 0) -> DegreeArray:
 def build_scale_lookup(
     scale_semitones: list[int] | np.ndarray,
 ) -> tuple[ScaleLookupArray, ScaleLookupCounts]:
-    """
-    Build a fixed-shape lookup table mapping every semitone (0-11) to its
-    possible (degree_0idx, alteration) interpretations within a scale.
-
-    Args:
-        scale_semitones: sorted semitone positions of the scale (length = MS.degrees).
-
-    Returns:
-        lookup : int8 array, shape (12, 2, 2).
-            lookup[st, k] = (degree, alteration) for the k-th interpretation.
-            Unused slots are filled with SENTINEL.
-        counts : int8 array, shape (12,).
-            Number of valid interpretations per semitone (1 or 2).
-    """
+    """Lookup (12, 2, 2) of (degree, alteration) per semitone, and counts (12,) of valid readings."""
     sc = np.sort(np.asarray(scale_semitones, dtype=DT.Note))
     n_deg = len(sc)
 
@@ -196,13 +170,7 @@ def build_scale_lookup(
 def build_all_scale_lookups(
     scale_semitones: list[int] | np.ndarray,
 ) -> tuple[ScaleLookupArray, ScaleLookupCounts]:
-    """
-    Build lookup tables for all 12 transpositions of a scale.
-
-    Returns:
-        lookups : int8 array, shape (12, 12, 2, 2)
-        counts  : int8 array, shape (12, 12)
-    """
+    """Lookups (12, 12, 2, 2) and counts (12, 12) for the 12 transpositions of a scale."""
     sc = np.asarray(scale_semitones, dtype=DT.Note)
     all_lookups = np.empty((MS.tones, MS.tones, 2, 2), dtype=DT.Note)
     all_counts = np.empty((MS.tones, MS.tones), dtype=DT.Note)
@@ -224,11 +192,7 @@ def _interpret_single_lookup(
     chord_semitones: np.ndarray,
     lookup: ScaleLookupArray,
 ) -> InterpretedDegreeArray:
-    """Fast-path: take slot-0 interpretation from a single lookup.
-
-    Used internally by the solver for per-scale scoring.
-    Sentinel values are passed through unchanged.
-    """
+    """Slot-0 interpretation from a single lookup. Sentinels pass through."""
     st = np.asarray(chord_semitones, dtype=DT.Note)
     original_shape = st.shape
 
@@ -251,39 +215,7 @@ def interpret_canonical(
     reference_roots: int | list[int] = 0,
     distance_fn: Callable[[int, int], float] | None = None,
 ) -> InterpretedDegreeArray:
-    """Tonality-aware canonical interpretation.
-
-    For each chromatic note in the chord, all 12 transpositions of every
-    supplied scale type cast a weighted vote for sharp vs flat spelling.
-    The weight is ``1 / (1 + distance)`` where *distance* is the
-    **minimum** circle-of-fifths distance between the tonality root and
-    any of the *reference_roots* (configurable via *distance_fn*).
-
-    In a progression context (start → ? → end), pass both the start and
-    end chord roots so that the middle chord's spelling is influenced by
-    both the backward-facing (where we came from) and forward-facing
-    (where we are going) tonal contexts.
-
-    Diatonic notes (alteration = 0) are unambiguous and always resolved
-    identically regardless of tonality.
-
-    Args:
-        chord_semitones: int8 array, shape (n_notes,). Values 0-11.
-        scale_semitones_list: list of scale definitions (e.g.
-            ``[IONIAN_SEMITONES]``).  All 12 transpositions are built for
-            each.
-        reference_roots: one or more root pitch-classes (0-11) from which
-            CoF distance is measured.  Can be a single int or a list.
-            When multiple roots are given the minimum distance to any of
-            them is used, giving equal influence to backward and forward
-            tonal context.
-        distance_fn: ``(root, reference_root) -> numeric`` used for
-            weighting.  Defaults to :func:`_cof_distance`.
-
-    Returns:
-        InterpretedIntervalArray, shape (n_notes, 3):
-        ``(degree, semitone, alteration)``.
-    """
+    """Canonical (degree, semitone, alteration) per note, shape (n_notes, 3), spelled by a tonality vote weighted by distance to *reference_roots*."""
     if distance_fn is None:
         distance_fn = _cof_distance
 
@@ -398,18 +330,7 @@ def interpret_all(
     lookup: ScaleLookupArray,
     counts: ScaleLookupCounts,
 ) -> list[InterpretedDegreeArray]:
-    """
-    Rich-path interpretation: enumerate all valid interpretation combinations for
-    a chord. Only used for analysis of specific candidates.
-
-    Args:
-        chord_semitones: 1-D int8 array of semitone values.
-        lookup: shape (12, 2, 2).
-        counts: shape (12,).
-
-    Returns:
-        List of InterpretedIntervalArray, each shape (n_notes, 3).
-    """
+    """All valid interpretation combinations of a chord, each (n_notes, 3)."""
     st = np.asarray(chord_semitones, dtype=DT.Note).ravel()
     valid = st >= 0
     active_st = st[valid]
@@ -445,15 +366,7 @@ def resolution_score(
     interpreted_from: InterpretedDegreeArray,
     interpreted_to: InterpretedDegreeArray,
 ) -> float:
-    """
-    Score how well alterations in `interpreted_from` resolve into `interpreted_to`.
-
-    Sharp notes (+1) that move up by a semitone and flat notes (-1) that move
-    down by a semitone are considered good resolutions. Returns a score in [0, 1]
-    where 1 = all alterations resolve correctly.
-
-    Only considers notes with non-zero alteration in the source chord.
-    """
+    """Share of the alterations in *interpreted_from* that resolve by step into *interpreted_to*, in [0, 1]."""
     from_alt = interpreted_from[..., 2].ravel()
     from_st = interpreted_from[..., 1].ravel()
     to_st = interpreted_to[..., 1].ravel()
@@ -485,3 +398,23 @@ def resolution_score(
     # Score: +1 if resolution direction matches alteration sign, 0 otherwise
     resolves = (np.sign(closest_diff) == np.sign(alts)) & (np.abs(closest_diff) <= 2)
     return float(np.mean(resolves))
+
+
+# ---------------------------------------------------------------------------
+# Conversion between chromas and interpreted degrees
+# ---------------------------------------------------------------------------
+
+
+def chroma_to_interpreted(v: ArrayLike, lookup: ScaleLookupArray) -> InterpretedDegreeArray:
+    """Interpret a chroma through one scale lookup."""
+    st = chroma.to_members(v)  # type: ignore
+    return _interpret_single_lookup(st, lookup)
+
+
+def interpreted_to_chroma(v: InterpretedDegreeArray) -> ChromaKeyArray:
+    """Chroma key from the semitone column of an interpreted array."""
+    st = v[..., 1].ravel()
+    valid = st >= 0
+    chroma_vec = np.zeros(MS.tones, dtype=DT.Bool)
+    chroma_vec[st[valid]] = True
+    return chroma.from_vector(chroma_vec)

@@ -1,25 +1,8 @@
-"""Pluggable scoring functions for the chord solver.
-
-Each score function takes a :class:`ScoringContext` and returns a
-``(raw, normalized)`` tuple of arrays.  Normalized values are in [0, 1]
-where 0 = best.
-
-To add a custom score, write a function matching this protocol and wrap it
-in a :class:`ScoreFn`::
-
-    def my_score(ctx: ScoringContext) -> tuple[np.ndarray, np.ndarray]:
-        raw = ...  # shape (n_scales, n_cand) or (n_cand,)
-        norm = ... # normalize to [0, 1], 0=best
-        return raw, norm
-
-    MY_SCORE = ScoreFn("my_score", my_score, default_weight=1.0)
-
-Then pass ``score_fns=default_score_fns() + [MY_SCORE]`` to
-:func:`solver.solve`.
-"""
+"""Score functions for the chord solver; tuning formula, ratios and dissonance."""
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -28,8 +11,147 @@ from scipy.special import logsumexp as _scipy_logsumexp
 
 from ..constants import DefaultMusicSystem as MS
 from ..types import DT, SENTINEL, ChromaVec
-from . import freq_ops
-from . import interval as interval
+from . import scale
+
+# ---------------------------------------------------------------------------
+# Tuning formula, frequency ratios and dissonance
+# ---------------------------------------------------------------------------
+
+
+def midi_freq(midi_value: int) -> float:
+    """Convert MIDI note number to frequency in Hz."""
+    return 440 * (2 ** (float(midi_value - 69) / 12))
+
+
+# https://arxiv.org/pdf/1306.6458#subsection.3.2
+def approximate_frequency_ratio(f1: float, f2: float, d: float = 0.01, divide_by: int = 1) -> tuple[int, int, float]:
+    r_init = f2 / f1
+    r_min, r_max = (r_init * (1 - d), r_init * (1 + d))
+    a_low, b_low = math.floor(r_init), 1
+    a_high, b_high = math.ceil(r_init), 1
+    a, b = round(r_init), 1
+    r = a / b
+
+    while r < r_min or r > r_max:
+        r0 = 2 * r_init - r
+        if r_init < r:
+            a_high, b_high = a, b
+            k = math.floor((r0 * b_low - a_low) / (a_high - r0 * b_high))
+            a_low, b_low = (a_low + k * a_high, b_low + k * b_high)
+        else:
+            a_low, b_low = a, b
+            k = math.floor((a_high - r0 * b_high) / (r0 * b_low - a_low))
+            a_high, b_high = (a_high + k * a_low, b_high + k * b_low)
+        a, b = a_low + a_high, b_low + b_high
+        r = a / b
+    b = b * divide_by
+    r = r / divide_by
+    return (a, b, r)
+
+
+def relative_periodicity(semitones: list[int], reference_index: int = 0, d: float = 0.011, sort: bool = True) -> int:
+    reference_freq = 2 ** (semitones[reference_index] / 12)
+    ratios = [
+        approximate_frequency_ratio(
+            reference_freq,
+            2 ** ((s + 12 * (i < reference_index)) / 12),
+            d,
+            divide_by=(i < reference_index) + 1,
+        )
+        for i, s in enumerate(semitones)
+    ]
+    denominators = [r[1] for r in ratios]
+    return int(ratios[0][2] * math.lcm(*denominators))
+
+
+def smoothed_relative_periodicity(
+    semitones: list[int],
+    d: float = 0.011,
+    sort: bool = True,
+    log: bool = True,
+    verbose: bool = True,
+) -> float:
+    current_semitones = sorted(list(set(semitones))) if sort else list(set(semitones))
+    n = len(current_semitones)
+    relative_periodicities: list[int] = []
+    for i in range(len(current_semitones)):
+        current_semitones = [s - current_semitones[i] for s in current_semitones]
+        relative_periodicities.append(relative_periodicity(current_semitones, reference_index=i, d=d))
+    smoothed_periodicity = sum([math.log2(rp) for rp in relative_periodicities]) / n if log else sum(relative_periodicities) / n
+    if verbose:
+        print(f"Chord {semitones}, dissonance: {smoothed_periodicity}")
+
+    return smoothed_periodicity
+
+
+def midi_interval_ratio(midi1: int, midi2: int, d: float = 0.011) -> tuple[int, int, float]:
+    f1 = midi_freq(midi1)
+    f2 = midi_freq(midi2)
+    return approximate_frequency_ratio(f1, f2, d)
+
+
+def relative_dissonance(semitones: list[int], d: float = 0.011, reference_index: int = 0) -> float:
+    """Dissonance from the relative periodicity against one reference note, not smoothed."""
+    unique = sorted(set(semitones))
+    if len(unique) < 1:
+        return 0.0
+    # Normalize semitones relative to the reference
+    normalized = [s - unique[reference_index] for s in unique]
+    rp = relative_periodicity(normalized, reference_index=0, d=d)
+    return math.log2(rp)
+
+
+def pairwise_dissonance(semitones: list[int], d: float = 0.011) -> float:
+    """Sum of log2(relative periodicity) over every pair of notes."""
+    unique = sorted(set(semitones))
+    if len(unique) < 2:
+        return 0.0
+    total = 0.0
+    count = 0
+    for i in range(len(unique)):
+        for j in range(i + 1, len(unique)):
+            rp = relative_periodicity([unique[i], unique[j]], reference_index=0, d=d)
+            total += math.log2(rp)
+            count += 1
+    return total / count if count else 0.0
+
+
+def max_pairwise_dissonance(semitones: list[int], d: float = 0.011) -> float:
+    """Largest pairwise dissonance among all note pairs."""
+    unique = sorted(set(semitones))
+    if len(unique) < 2:
+        return 0.0
+    worst = 0.0
+    for i in range(len(unique)):
+        for j in range(i + 1, len(unique)):
+            rp = relative_periodicity([unique[i], unique[j]], reference_index=0, d=d)
+            worst = max(worst, math.log2(rp))
+    return worst
+
+
+# Registry of dissonance methods
+DISSONANCE_METHODS: dict[str, type[None]] = {}  # populated below
+
+
+def dissonance(
+    semitones: list[int],
+    method: str = "smoothed",
+) -> float:
+    """Dissonance of a chord by *method*: smoothed, smoothed_raw, relative, raw, pairwise or max_pairwise."""
+    if method == "smoothed":
+        return smoothed_relative_periodicity(semitones, verbose=False, log=True)
+    elif method == "smoothed_raw":
+        return smoothed_relative_periodicity(semitones, verbose=False, log=False)
+    elif method == "relative":
+        return relative_dissonance(semitones)
+    elif method == "raw":
+        return relative_periodicity(semitones)
+    elif method == "pairwise":
+        return pairwise_dissonance(semitones)
+    elif method == "max_pairwise":
+        return max_pairwise_dissonance(semitones)
+    else:
+        raise ValueError(f"Unknown dissonance method {method!r}. Choose from: 'smoothed', 'smoothed_raw', 'relative', 'pairwise', 'max_pairwise'.")
 
 # ---------------------------------------------------------------------------
 # Types
@@ -38,36 +160,18 @@ from . import interval as interval
 
 @dataclass
 class ScoringContext:
-    """All shared data available to scoring functions.
+    """All shared data available to scoring functions."""
 
-    Attributes:
-        candidate_interps: shape ``(n_scales, n_cand, max_notes, 3)``.
-        start_interp: shape ``(n_scales, 1, max_notes, 3)``.
-        end_interp: shape ``(n_scales, 1, max_notes, 3)``.
-        candidate_semitones: shape ``(n_cand, max_notes)``.
-        start_semitones: shape ``(1, max_notes)``.
-        end_semitones: shape ``(1, max_notes)``.
-        candidate_lengths: shape ``(n_cand,)``.
-        candidate_dissonance: shape ``(n_cand,)``.
-        candidate_roots: shape ``(n_cand,)``.
-        candidate_tertian: shape ``(n_cand,)``.
-        start_root: Root pitch-class of the start chord.
-        end_root: Root pitch-class of the end chord.
-        start_length: Number of notes in the start chord.
-        end_length: Number of notes in the end chord.
-        max_notes: Maximum chord cardinality (used for normalization).
-    """
-
-    candidate_interps: np.ndarray
-    start_interp: np.ndarray
-    end_interp: np.ndarray
-    candidate_semitones: np.ndarray
-    start_semitones: np.ndarray
-    end_semitones: np.ndarray
-    candidate_lengths: np.ndarray
-    candidate_dissonance: np.ndarray
-    candidate_roots: np.ndarray
-    candidate_tertian: np.ndarray
+    candidate_interps: np.ndarray  # (n_scales, n_cand, max_notes, 3)
+    start_interp: np.ndarray  # (n_scales, 1, max_notes, 3)
+    end_interp: np.ndarray  # (n_scales, 1, max_notes, 3)
+    candidate_semitones: np.ndarray  # (n_cand, max_notes)
+    start_semitones: np.ndarray  # (1, max_notes)
+    end_semitones: np.ndarray  # (1, max_notes)
+    candidate_lengths: np.ndarray  # (n_cand,)
+    candidate_dissonance: np.ndarray  # (n_cand,)
+    candidate_roots: np.ndarray  # (n_cand,)
+    candidate_tertian: np.ndarray  # (n_cand,)
     start_root: int
     end_root: int
     start_length: int
@@ -77,16 +181,7 @@ class ScoringContext:
 
 @dataclass
 class ScoreFn:
-    """A pluggable scoring function.
-
-    Attributes:
-        name: Unique key used in weights dict and DataFrame columns.
-        fn: ``Callable(ScoringContext) → (raw, normalized)``.
-            Both arrays have shape ``(n_scales, n_cand)`` for
-            scale-dependent scores or ``(n_cand,)`` for scale-independent.
-            *normalized* is [0, 1] where 0 = best.
-        default_weight: Weight used when the weights dict omits this key.
-    """
+    """A pluggable score: a name, fn(ctx) -> (raw, normalized in [0, 1], 0 = best), and a default weight."""
 
     name: str
     fn: Callable[[ScoringContext], tuple[np.ndarray, np.ndarray]]
@@ -99,14 +194,7 @@ class ScoreFn:
 
 
 def batch_alteration_cost(interpretations: np.ndarray) -> np.ndarray:
-    """Sum of |alteration| per chord.
-
-    Args:
-        interpretations: shape ``(..., max_notes, 3)``.
-
-    Returns:
-        int array, shape ``(...)``.
-    """
+    """Sum of |alteration| per chord: (..., max_notes, 3) -> (...)."""
     alt = interpretations[..., 2]
     mask = alt != SENTINEL
     return np.sum(np.abs(alt) * mask, axis=-1)
@@ -116,14 +204,7 @@ def batch_resolution_score(
     interp_from: np.ndarray,
     interp_to: np.ndarray,
 ) -> np.ndarray:
-    """Vectorized resolution scoring.
-
-    For each chord in *interp_from*, score how well its alterations
-    resolve into the corresponding chord in *interp_to*.
-
-    Returns:
-        float array, shape ``(...)``. Score in [0, 1].
-    """
+    """Share of the alterations of *interp_from* that resolve into *interp_to*, in [0, 1], shape (...)."""
     from_alt = interp_from[..., 2]
     from_st = interp_from[..., 1].astype(np.int16)
     to_st = interp_to[..., 1].astype(np.int16)
@@ -155,11 +236,7 @@ def batch_voice_leading_cost(
     from_st: np.ndarray,
     to_st: np.ndarray,
 ) -> np.ndarray:
-    """Minimum total semitone movement between two chords.
-
-    Returns:
-        float array, shape ``(...)``. Lower = smoother voice leading.
-    """
+    """Sum of nearest-note semitone movements between two chords, shape (...)."""
     f = from_st.astype(np.int16)
     t = to_st.astype(np.int16)
 
@@ -186,16 +263,13 @@ def batch_root_distance(
     candidate_roots: np.ndarray,
     reference_root: int,
 ) -> np.ndarray:
-    """Combined CoF + semitone distance from candidate roots to a reference.
-
-    Returns ``cof_dist + 0.5 * semitone_dist``.
-    """
+    """Circle-of-fifths distance plus half the semitone distance from candidate roots to a reference."""
     n = len(candidate_roots)
     cof = np.empty(n, dtype=np.float64)
     semi = np.empty(n, dtype=np.float64)
     for i in range(n):
         r = int(candidate_roots[i])
-        cof[i] = interval._cof_distance(r, reference_root)
+        cof[i] = scale._cof_distance(r, reference_root)
         semi[i] = _semitone_distance(r, reference_root)
     return cof + 0.5 * semi
 
@@ -212,11 +286,7 @@ _TRIAD_PATTERNS = np.array(
 
 
 def batch_tertian_score(chromas: ChromaVec) -> np.ndarray:
-    """Check whether each chord contains a standard triad.
-
-    Returns:
-        float64 array, shape ``(n,)``. 1.0 = contains a triad, 0.0 = not.
-    """
+    """1.0 where the chord contains a standard triad, else 0.0, shape (n,)."""
     n = chromas.shape[0]
     result = np.zeros(n, dtype=np.float64)
     for i in range(n):
@@ -318,18 +388,14 @@ def batch_dissonance(
     roots: np.ndarray | None = None,
     method: str = "smoothed",
 ) -> np.ndarray:
-    """Compute dissonance for each chord.
-
-    Returns:
-        float64 array, shape ``(n,)``. Higher = more dissonant.
-    """
+    """Dissonance of each chord, shape (n,). Higher is more dissonant."""
     n = chromas.shape[0]
     result = np.empty(n, dtype=np.float64)
     for i in range(n):
         st = [int(x) for x in np.flatnonzero(chromas[i])]
         if roots is not None:
             st = root_position_semitones(st, int(roots[i]))
-        result[i] = freq_ops.dissonance(st, method=method)
+        result[i] = dissonance(st, method=method)
     return result
 
 
@@ -459,12 +525,7 @@ def default_score_fns(
     min_voice_leading: float = 1.0,
     max_voice_leading: float = 6.0,
 ) -> list[ScoreFn]:
-    """Build the default set of scoring functions.
-
-    Args:
-        min_voice_leading: Minimum desired voice-leading distance.
-        max_voice_leading: Maximum desired voice-leading distance.
-    """
+    """The default score functions, for a desired voice-leading range."""
     return [
         ALTERATION_COST,
         RESOLUTION_IN,

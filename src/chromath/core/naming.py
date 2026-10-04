@@ -1,8 +1,4 @@
-"""
-A file containing the logic to compute proper names and user-faced information.
-This is a complex matter as composers themselves sometimes struggle with it.
-For now, we have simplified functions that do not depend on context.
-"""
+"""Note and chord names."""
 
 from ..constants import Letter
 
@@ -44,10 +40,7 @@ def get_pitch_name(semitones: int, prefer_sharp: bool = True) -> str:
 
 
 class PitchName:
-    """
-    Class to better handle traditional pitch notation, with letters and accidentals.
-    Not used for now, depends on the tonality and accidentals.
-    """
+    """Pitch notation with letters and accidentals. Not used yet."""
     # TODO: Refactor depending on scale.
     # TODO: Adjust depending on the considered tonality.
 

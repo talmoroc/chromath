@@ -5,11 +5,8 @@ import pandas as pd
 
 from ..constants import DefaultMusicSystem as MS
 from ..types import DT, SENTINEL, ChromaVec, ScaleLookupArray
-from . import chroma
-from . import interval as interval
-
-#  from . import conversion as conv
-from .scores import (  # noqa: F401
+from . import chroma, scale
+from .scoring import (  # noqa: F401
     _TRIAD_PATTERNS,
     AGGREGATION_METHODS,
     DEFAULT_SCORE_FNS,
@@ -33,26 +30,12 @@ def compute_tonality_weights(
     reference_root: int | None = None,
     distance_fn=None,
 ) -> np.ndarray:
-    """Compute weights for each of 12 tonalities based on circle-of-fifths distance.
-
-    Weights reflect how likely each tonality (scale transposition) is to be the
-    "current tonal context". A tonality closer to the reference root gets higher
-    weight using a ``1 / (1 + distance)`` formula.
-
-    Args:
-        reference_root: Root pitch-class (0-11) to measure distance from.
-            If None, returns uniform weights (all 1/12).
-        distance_fn: Function ``(root_a, root_b) -> int`` for computing
-            circle-of-fifths distance. Defaults to ``interval._cof_distance``.
-
-    Returns:
-        np.ndarray shape (12,) with weights summing to 1.0.
-    """
+    """Weights (12,) summing to 1 for the 12 tonalities: 1 / (1 + distance to *reference_root*), uniform if it is None."""
     if reference_root is None:
         return np.ones(MS.tones, dtype=np.float64) / MS.tones
 
     if distance_fn is None:
-        distance_fn = interval._cof_distance
+        distance_fn = scale._cof_distance
 
     weights = np.zeros(MS.tones, dtype=np.float64)
     for tonality_root in range(MS.tones):
@@ -65,12 +48,7 @@ def compute_tonality_weights(
 
 
 def generate_all_chromas(min_notes: int = 2, max_notes: int = 7) -> ChromaVec:
-    """
-    Generate all binary subsets of {0..11} with cardinality in [min_notes, max_notes].
-
-    Returns:
-        ChromaArray, shape (n_candidates, 12) bool.
-    """
+    """All chroma vectors with cardinality in [min_notes, max_notes], shape (n_candidates, 12)."""
     rows: list[np.ndarray] = []
     for k in range(min_notes, max_notes + 1):
         for combo in combinations(range(MS.tones), k):
@@ -84,16 +62,7 @@ def batch_interpret_canonical(
     candidate_semitones: np.ndarray,
     lookups: ScaleLookupArray,
 ) -> np.ndarray:
-    """
-    Vectorized canonical interpretation of all candidates against all scale lookups.
-
-    Args:
-        candidate_semitones: int8, shape (n_candidates, max_notes).
-        lookups: int8, shape (n_scales, 12, 2, 2).
-
-    Returns:
-        int8 array, shape (n_scales, n_candidates, max_notes, 3): (degree, semitone, alteration).
-    """
+    """Candidates (n_cand, max_notes) through lookups (n_scales, 12, 2, 2): (n_scales, n_cand, max_notes, 3) of (degree, semitone, alteration)."""
     lookups = np.asarray(lookups)
     n_scales = lookups.shape[0]
     n_cand, max_notes = candidate_semitones.shape
@@ -126,24 +95,7 @@ def score_candidates(
     weights: dict[str, float] | None = None,
     aggregation: str = "weighted_sum",
 ) -> tuple[np.ndarray, dict[str, np.ndarray], dict[str, np.ndarray]]:
-    """Score all candidates for the middle position in start → ? → end.
-
-    Each :class:`ScoreFn` in *score_fns* is evaluated against *ctx*.
-    Normalized scores ([0, 1], 0=best) are aggregated using the chosen method.
-
-    Args:
-        ctx: Scoring context with all candidate and chord data.
-        score_fns: List of scoring functions.  ``None`` → :data:`DEFAULT_SCORE_FNS`.
-        weights: dict mapping score name → weight.  Missing keys fall back
-            to each :attr:`ScoreFn.default_weight`.
-        aggregation: ``"weighted_sum"``, ``"logsumexp"``, or ``"weighted_product"``.
-
-    Returns:
-        ``(scores, raw_subscores, norm_subscores)``:
-        - *scores*: float array, shape ``(n_scales, n_cand)``. Lower = better.
-        - *raw_subscores*: dict of un-normalized arrays.
-        - *norm_subscores*: dict of [0,1]-normalized arrays.
-    """
+    """Score all candidates for the middle of start → ? → end: scores (n_scales, n_cand), raw sub-scores, normalized sub-scores."""
     if score_fns is None:
         score_fns = DEFAULT_SCORE_FNS
     if weights is None:
@@ -171,7 +123,7 @@ def score_candidates(
     for sf in score_fns:
         resolved_weights[sf.name] = weights.get(sf.name, sf.default_weight)
 
-    from .scores import AGGREGATION_METHODS as _agg_methods
+    from .scoring import AGGREGATION_METHODS as _agg_methods
 
     agg_fn = _agg_methods.get(aggregation, _agg_methods["weighted_sum"])
     scores = agg_fn(components, resolved_weights)
@@ -200,15 +152,7 @@ def score_candidate_breakdown(
     max_notes: int = 7,
     score_fns: list[ScoreFn] | None = None,
 ) -> dict:
-    """Break down the score for a single candidate at a specific scale.
-
-    Runs each :class:`ScoreFn` on a mini context for the single candidate,
-    returning raw, normalized, and weighted values.
-
-    Returns:
-        ``{"raw": {name: float}, "normalized": {name: float},
-        "weighted": {name: float}, "score": float}``
-    """
+    """Raw, normalized and weighted sub-scores of one candidate at one scale."""
     if score_fns is None:
         score_fns = DEFAULT_SCORE_FNS
     if weights is None:
@@ -258,18 +202,7 @@ def score_candidate_breakdown(
 
 
 def results_to_dataframe(result: dict, top_n: int | None = None) -> pd.DataFrame:
-    """Build a pandas DataFrame from ``solve()`` output.
-
-    Columns include: rank, root, n_notes, mean_score, plus raw_* and norm_*
-    for each sub-score, and the chroma vector.
-
-    Args:
-        result: dict returned by ``solve()``.
-        top_n: limit to top N candidates (default: all best_indices).
-
-    Returns:
-        DataFrame sorted by mean score (lower=better).
-    """
+    """DataFrame of a solve() result, sorted by mean score."""
     import pandas as pd
 
     indices = result["best_indices"]
@@ -323,35 +256,7 @@ def solve(
     tonality_weights: np.ndarray | None = None,
     preceding_root: int | None = None,
 ) -> dict:
-    """Find the best candidate chords for start → ? → end across multiple scales.
-
-    Args:
-        start_chroma: shape (12,) bool.
-        end_chroma: shape (12,) bool.
-        scale_semitones: list of scale definitions (each a list of semitones).
-        min_notes, max_notes: cardinality range for candidates.
-        top_n: number of top candidates to return.
-        weights: scoring weights dict.  Keys match :attr:`ScoreFn.name`.
-        score_fns: list of :class:`ScoreFn`.  ``None`` builds the default
-            set, extracting ``min_voice_leading`` / ``max_voice_leading``
-            from *weights* when present.
-        exclude_same_root: if True, filter out candidates sharing root with
-            start/end.
-        exclude_subsets: if True, filter out candidates whose pitch classes
-            are a strict subset of (or equal to) start or end.
-        dissonance_method: ``"smoothed"`` (default), ``"pairwise"``,
-            ``"max_pairwise"``.
-        aggregation: ``"weighted_sum"``, ``"logsumexp"``, ``"weighted_product"``.
-        preceding_root: optional root pitch-class (0-11) of the preceding chord.
-            If provided, scores are averaged across tonalities using weights based
-            on circle-of-fifths distance. If None, uses uniform averaging.
-
-    Returns:
-        dict with keys ``candidates``, ``scores``, ``best_indices``,
-        ``best_scores``, ``lookups``, ``counts``, ``roots``, ``dissonance``,
-        ``start_root``, ``end_root``, ``lengths``, ``raw_subscores``,
-        ``norm_subscores``, plus internal arrays prefixed with ``_``.
-    """
+    """Find the best candidate chords for start → ? → end across multiple scales."""
     # Resolve score_fns (backward compat: extract VL params from weights)
     if score_fns is None:
         min_vl = weights.get("min_voice_leading", 1.0) if weights else 1.0
@@ -362,7 +267,7 @@ def solve(
     all_lookups = []
     all_counts = []
     for sc in scale_semitones:
-        lk, ct = interval.build_all_scale_lookups(sc)
+        lk, ct = scale.build_all_scale_lookups(sc)
         all_lookups.append(lk)
         all_counts.append(ct)
     lookups = np.concatenate(all_lookups, axis=0)  # (n_scales, 12, 2, 2)

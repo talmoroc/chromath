@@ -1,7 +1,6 @@
-from . import constants, core, naming
+from . import constants, core
 
 __all__ = [
     "constants",
     "core",
-    "naming",
 ]

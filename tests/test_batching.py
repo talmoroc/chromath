@@ -1,9 +1,4 @@
-"""Every chroma operation is elementwise.
-
-An operation on an array of keys must agree, entry for entry, with the same
-operation applied to each key on its own. That one rule covers batching,
-broadcasting and shape preservation together.
-"""
+"""Tests for batch operations"""
 
 import numpy as np
 import pytest
@@ -82,7 +77,7 @@ ONE = [*UNARY, ("from_vector", lambda c: chroma.from_vector(chroma.to_vector(c))
 @pytest.mark.parametrize(("name", "f"), ONE, ids=[n for n, _ in ONE])
 @given(chromas)
 def test_a_unary_operation_on_one_chroma_returns_an_array(name, f, c):
-    """NumPy demotes 0-d results to scalars; the library must not pass that on."""
+    """NumPy demotes 0-d results to scalars; the library must not."""
     assert isinstance(c, np.ndarray) and c.ndim == 0
     assert isinstance(f(c), np.ndarray)
 
@@ -109,15 +104,14 @@ def test_conversion_round_trips_over_a_batch(arr, grid):
 
 # ── cycle functions ─────────────────────────────────────────────────────
 
-#: Cycles with a period of at least four, so a batch can be reshaped. Bare
-#: notes and chords alike, since what a cycle starts on changes nothing about batching.
+#: Cycles with a period of at least four, so a batch can be reshaped.
 CYCLES = [(7, 0, "unison"), (3, 9, "unison"), (7, 0, "major"), (3, 9, "dom7")]
 CYCLE_IDS = ["step7", "step3_from9", "step7_major", "step3_from9_dom7"]
 
 
 @pytest.fixture(params=CYCLES, ids=CYCLE_IDS)
 def members(request):
-    """One turn of a cycle: what every core cycle function takes."""
+    """One turn of a cycle."""
     return turn(*request.param)
 
 
@@ -131,7 +125,7 @@ def test_cycle_rank_is_elementwise(members, direction):
 
 
 def test_cycle_dist_is_elementwise_and_broadcasts(members):
-    """Pairwise over matching shapes, a lone chroma against an array, a column against a row."""
+    """Pairwise, lone against array, column against row."""
     a, b = members[:4], members[-4:]
     lone = members[0, ...]
 
@@ -144,7 +138,7 @@ def test_cycle_dist_is_elementwise_and_broadcasts(members):
 
 
 def test_cycle_functions_on_one_chroma_return_a_0d_array(members):
-    """One chroma in, one 0-d array out: neither a NumPy scalar nor a one-element array."""
+    """One chroma in, one 0-d array out."""
     one = members[0, ...]
     for got in (cycle.mask(members), cycle.rank(members, one), cycle.dist(members, one, one)):
         assert isinstance(got, np.ndarray) and got.ndim == 0

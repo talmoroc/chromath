@@ -13,7 +13,7 @@ C: Final = ChromaKey(DT.Key(1))
 
 
 def _ranks(key: int | slice, stop: int) -> NDArray[np.integer]:
-    """The ranks an index names: one rank, or a slice read unclamped and signed."""
+    """The ranks named by an index or a slice."""
     if not isinstance(key, slice):
         return np.asarray(key)
     return np.arange(key.start or 0, stop if key.stop is None else key.stop, key.step or 1)
@@ -21,20 +21,13 @@ def _ranks(key: int | slice, stop: int) -> NDArray[np.integer]:
 
 @dataclass(frozen=True, init=False)
 class Cycle:
-    """A cycle of chromas given by repeated transpositions of a starting chroma by a fixed step.
-
-    - step: the number of semitones between an element of the cycle and the next.
-    - start: the chroma key of the first element, a single C by default.
-
-    This is the public face of `core.cycle`: it validates what it is given, then
-    hands over to the trusted functions.
-    """
+    """A cycle of chromas: a starting chroma transposed repeatedly by a fixed step."""
 
     step: int
     start: ChromaKey
 
     def __init__(self, step: int, start: ArrayLike = C):
-        # Frozen, so the parsed values are stored through object.__setattr__.
+        # Frozen: store through object.__setattr__.
         object.__setattr__(self, "step", int(chroma.as_note_index(step)))
         object.__setattr__(self, "start", chroma.as_key(start))
 
@@ -45,7 +38,7 @@ class Cycle:
 
     @property
     def period(self) -> int:
-        """How many steps before the start returns to itself, between 1 and 12."""
+        """How many steps before the start returns to itself."""
         return len(self.members)
 
     @property
@@ -63,15 +56,15 @@ class Cycle:
         return cycle.semitones(self.members, padded)
 
     def rank(self, c: ArrayLike, direction: Direction = "min") -> IntArray:
-        """Position of each chroma of *c* within this cycle, or raise if one is outside it."""
+        """Rank of each chroma in the cycle."""
         return cycle.rank(self.members, chroma.validate_chroma_keys(c), direction)
 
     def dist(self, a: ArrayLike, b: ArrayLike) -> IntArray:
-        """Steps between two members the short way round, elementwise and broadcast."""
+        """Steps between two members the short way round."""
         return cycle.dist(self.members, chroma.validate_chroma_keys(a), chroma.validate_chroma_keys(b))
 
     def at(self, ranks: ArrayLike) -> ChromaKeyArray:
-        """The chromas reached after *ranks* steps. Negative ranks go backward."""
+        """The chromas at the given ranks."""
         members = self.members
         return np.asarray(members[np.asarray(ranks) % len(members)])
 
@@ -82,7 +75,7 @@ class Cycle:
         return iter(self.members)
 
     def __getitem__(self, key: int | slice) -> ChromaKeyArray:
-        """The chroma at a rank, or the chromas a range of ranks names."""
+        """The chroma at a rank, or the chromas of a slice of ranks."""
         return self.at(_ranks(key, len(self)))
 
     @property
@@ -93,7 +86,7 @@ class Cycle:
 
 @dataclass(frozen=True)
 class _SymmetricCycle:
-    """The members of a cycle paired by distance: entry *d* is ranks +d and -d, so the result is always ``(..., 2)``."""
+    """Cycle members paired by distance: entry d is ranks +d and -d."""
 
     cycle: Cycle
 

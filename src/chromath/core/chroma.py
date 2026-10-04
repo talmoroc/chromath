@@ -1,14 +1,4 @@
-"""Chroma: a set of pitch classes.
-
-The canonical form is a MS.tones-bit key (12 is standard) (``uint16``), little-endian — bit *i* is
-pitch class *i*, so index 0 is C and a C major chord is ``0b000010010001``.
-``ChromaBoolArray`` is the twelve-lane view, materialised only where pitch
-classes need to be addressed individually.
-
-Keys are why the set operations are cheap: union, intersection and difference
-are single instructions, and cardinality is ``bitwise_count``. Every function
-here is elementwise, so it works on a scalar key or on any array of them.
-"""
+"""Chromas: sets of pitch classes, as little-endian MS.tones-bit keys."""
 
 from typing import Literal
 
@@ -44,7 +34,7 @@ _REVERSED = np.array(  # Bit-reversal of a 12-bit key, used by `invert`.
 
 
 def validate_chroma_keys(batch: ArrayLike) -> ChromaKeyArray:
-    """Reject keys outside the MS.tones-bit range and convert to numpy array."""
+    """Reject keys outside the MS.tones-bit range."""
     arr = np.asarray(batch)
     if not np.issubdtype(arr.dtype, np.integer):
         raise TypeError(f"Chromas must be integers, got dtype {arr.dtype}")
@@ -55,7 +45,7 @@ def validate_chroma_keys(batch: ArrayLike) -> ChromaKeyArray:
 
 
 def validate_chroma_vecs(batch: ArrayLike) -> ChromaVecArray:
-    """Reject arrays of shape not (..., MS.tones) or that contains non-bool like values"""
+    """Reject shapes other than (..., MS.tones) and values other than 0 or 1."""
     arr = np.asarray(batch)
     if not arr.shape[-1] == 12:
         raise ValueError(f"ChromaVecs must be (..., {MS.tones}), got shape {arr.shape}")
@@ -77,7 +67,7 @@ def validate_note_index_array(note_idx: ArrayLike) -> NoteIndexArray:
 
 
 def validate_note_keys(batch: ArrayLike) -> NoteKeyArray:
-    """Validates that there is a single note"""
+    """Reject keys that do not hold exactly one note."""
     arr = validate_chroma_keys(batch)
     bad = np.bitwise_count(arr) != 1
     if bad.any():
@@ -94,7 +84,7 @@ def validate_note_vecs(batch: ArrayLike) -> NoteVecArray:
 
 
 def validate_chroma_members_array(batch: ArrayLike) -> ChromaMembersArray:
-    """Reject arrays of shape not (..., width) or that contains non-integer values outside 0..MS.tones-1 or SENTINEL"""
+    """Reject 0-d input and values other than pitch classes or SENTINEL."""
     arr = np.asarray(batch)
     if not np.issubdtype(arr.dtype, np.integer):
         raise TypeError(f"Chromas must be integers, got dtype {arr.dtype}")
@@ -141,20 +131,14 @@ def from_vector(v: ChromaVecArray) -> ChromaKeyArray:
 
 
 def from_members(members: ChromaMembersArray) -> ChromaKeyArray:
-    """Pitch-class indices -> key. The last axis lists the members of one chroma.
-
-    Leading axes are the batch: ``[0, 4, 7]`` is one chroma, ``[[0, 4, 7], [0, 3, 7]]``
-    two, and a lone index is a single note. Indices wrap mod 12. SENTINEL slots are
-    skipped, so chromas of different sizes share a batch by padding, and this
-    is the inverse of `to_members`.
-    """
+    """Member indices -> key, over the last axis. SENTINEL slots are skipped."""
     present = members != SENTINEL
     bits = DT.Key(1) << np.where(present, members, 0).astype(DT.Key)
     return union(np.where(present, bits, DT.Key(0)))
 
 
 def from_st(st: NoteIndexArray) -> NoteKeyArray:
-    """Note indices -> key. The input is a single index or an array of them, and the output is a single note key or an array of them."""
+    """Note indices -> note keys."""
     return np.asarray(DT.Key(1) << np.asarray(st, dtype=DT.Note), dtype=DT.Key)
 
 
@@ -166,11 +150,7 @@ def to_vector(c: ChromaKeyArray) -> ChromaVecArray:
 
 
 def to_members(c: ChromaKeyArray, width=MS.max_chroma_members) -> ChromaMembersArray:
-    """Key -> the semitones it contains, ascending, padded with SENTINEL to *MS.max_chroma_members*.
-
-    Batched counterpart of `to_index`: members differ in count, so the trailing
-    axis is padded. *width* defaults to
-    """
+    """Key -> its pitch classes, ascending, padded with SENTINEL to *width*."""
     max_cardinality = int(np.max(cardinality(c), initial=0))
     if width < max_cardinality:
         raise ValueError(f"width {width} is smaller than the largest chroma ({max_cardinality} notes)")
@@ -181,7 +161,7 @@ def to_members(c: ChromaKeyArray, width=MS.max_chroma_members) -> ChromaMembersA
 
 
 def to_st(c: NoteKeyArray) -> NoteIndexArray:
-    """Note keys -> note indices. The input is a single key or an array of them, and the output is a single index or an array of them."""
+    """Note keys -> note indices."""
     return np.asarray(np.bitwise_count(c - 1, dtype=np.uint8), dtype=DT.Note)
 
 
@@ -234,43 +214,29 @@ def isin(c: ChromaKeyArray, container: ChromaKeyArray) -> NDArray[DT.Bool]:
 
 
 def _overlap(shared, total):
-    """Fraction of *total* that is *shared*, defining 0/0 as 1.
-
-    An empty chroma compared with an empty chroma shares everything there is
-    to share, so the derived distance is 0 rather than nan.
-    """
+    """Fraction of *total* that is *shared*, with 0/0 defined as 1."""
     return np.divide(shared, total, out=np.ones(np.broadcast(shared, total).shape), where=total != 0)
 
 
-# Hamming: how many tones differ, relative to the twelve of the system.
 def hamming(c1: ChromaKeyArray, c2: ChromaKeyArray) -> ScoreArray:
     """Tones present in one chroma but not the other, over MS.tones."""
     ct = common_tones(c1, c2)
     return np.asarray((cardinality(c1) + cardinality(c2) - 2 * ct) / MS.tones, DT.Score)
 
 
-# Jaccard: how many tones differ, relative to the tones in either.
 def jaccard(c1: ChromaKeyArray, c2: ChromaKeyArray) -> ScoreArray:
     """Symmetric difference over union. Two empty chromas are at distance 0."""
     ct = common_tones(c1, c2)
     return np.asarray(1.0 - _overlap(ct, cardinality(c1) + cardinality(c2) - ct), DT.Score)
 
 
-# Tversky: asymmetric — how much of `from_` is missing from `to_`.
 def tversky(from_: ChromaKeyArray, to_: ChromaKeyArray) -> ScoreArray:
-    """Measures how much 'from_' is included in 'to_'. Not symmetric."""
+    """How much of *from_* is missing from *to_*. Not symmetric."""
     return np.asarray(1.0 - _overlap(common_tones(from_, to_), cardinality(from_)), DT.Score)
 
 
-# Symmetric Tversky: the reference is chosen as the minimum or maximum of difference to intersection, and weighted with beta and alpha
 def tversky_symm(c1: ChromaKeyArray, c2: ChromaKeyArray, beta: float = 2.0, alpha: float = 0.8) -> ScoreArray:
-    """
-    *Symmetric Tversky* with beta >= 2.0 and 0 <= alpha <= 1
-    - High alpha: more weight on the minimum difference (almost included = close, useful to compare similar chords with different extensions)
-    - Low alpha: more weight on the maximum difference (many notes outside = far)
-    - High beta: more weight on the difference parameter, the common tones weigh less.
-    If beta = 2.0 and alpha = 0.5, we get jaccard.
-    """
+    """Symmetric Tversky: *alpha* weighs the smaller difference, *beta* the differences against the common tones. beta=2, alpha=0.5 is Jaccard."""
     intersection = common_tones(c1, c2)
     union = np.bitwise_count(c1 | c2, dtype=np.uint8)
     a = np.minimum(union - cardinality(c1), union - cardinality(c2))

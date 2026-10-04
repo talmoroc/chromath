@@ -27,7 +27,7 @@ def cycle(step: int, start: ChromaKeyArray, stop: int | None = None) -> ChromaKe
 
 
 def semitones(cycle: ChromaKeyArray, padded: bool = True) -> ChromaMembersArray:
-    """The notes of each member, one row per rank. Padded."""
+    """The notes of each member, one row per rank."""
     if padded:
         return chroma.to_members(cycle)
     return chroma.to_members(cycle, chroma.cardinality(cycle)[0])
@@ -44,7 +44,7 @@ def is_complete(keys: ChromaKeyArray) -> bool:
 
 
 def rank(cycle: ChromaKeyArray, chroma: ChromaKeyArray, direction: Direction = "min") -> IntArray:
-    """Position of each chroma of *c* within this cycle, or raise if one is outside it."""
+    """Rank of each chroma in the cycle. Raises if one is outside it."""
     if direction not in DIRECTIONS:
         raise ValueError(f"direction must be one of {DIRECTIONS}")
     period: int = cycle.shape[-1]
@@ -65,7 +65,7 @@ def rank(cycle: ChromaKeyArray, chroma: ChromaKeyArray, direction: Direction = "
 
 
 def dist(cycle: ChromaKeyArray, a: ChromaKeyArray, b: ChromaKeyArray) -> IntArray:
-    """Steps between two members the short way round, elementwise and broadcast."""
+    """Steps between two members the short way round."""
     period: int = cycle.shape[-1]
     d = (rank(cycle, b, "forward") - rank(cycle, a, "forward")) % period
     return np.asarray(np.minimum(d, period - d), dtype=DT.Int)
