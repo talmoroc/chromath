@@ -48,14 +48,13 @@ class PitchName:
     Class to better handle traditional pitch notation, with letters and accidentals.
     Not used for now, depends on the tonality and accidentals.
     """
-
-    degree: int
-    accidental: int
-    # tonality: Tonality
     # TODO: Refactor depending on scale.
     # TODO: Adjust depending on the considered tonality.
 
-    def __init__(self):
+    def __init__(self, degree: int, accidental: int):
+        self.degree: int = degree
+        self.accidental: int = accidental
+        # tonality: Tonality
         self.letter: Letter = Letter(self.degree)
 
     def __str__(self):
@@ -65,3 +64,4 @@ class PitchName:
 
     def __repr__(self):
         return f"<{self.__class__.__name__}: {self.__str__()}>"
+

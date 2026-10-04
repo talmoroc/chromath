@@ -1,6 +1,7 @@
-from . import constants
-from . import core
-from . import components
-from . import naming
+from . import constants, core, naming
 
-__all__ = ["constants", "components", "core", "naming"]
+__all__ = [
+    "constants",
+    "core",
+    "naming",
+]
