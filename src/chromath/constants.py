@@ -1,18 +1,20 @@
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
+
 import numpy as np
 
-IONIAN_SEMITONES: list[int] = [0, 2, 4, 5, 7, 9, 11]
+IONIAN_SEMITONES = np.array([0, 2, 4, 5, 7, 9, 11])
 
 
 @dataclass(frozen=True)
 class DefaultMusicSystem:
     tones: int = 12
-    tones_set = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
+    tones_tuple = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+    max_chroma_members = 7
     degrees: int = 7
-    degrees_set = {0, 1, 2, 3, 4, 5, 6, 7}
+    degrees_tuple = (0, 1, 2, 3, 4, 5, 6, 7)
     func_degrees: int = 13  # degrees meaningful for intervals
-    func_degrees_set = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
+    func_degrees_tuple = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
     # bitwise representation of tones
     powers: tuple[int] = tuple(2**i for i in range(12))
     # max bitwise representation
@@ -20,6 +22,11 @@ class DefaultMusicSystem:
 
 
 MS = DefaultMusicSystem
+
+
+CHROMA_EMBEDDINGS = np.array(
+    [[(chroma & power) // power for power in MS.powers] for chroma in np.arange(2**12)]
+)  # table that has index 0-4095 and as values the 12-bit vectors with 1 and 0
 
 
 class Letter(Enum):

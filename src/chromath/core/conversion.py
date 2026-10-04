@@ -1,19 +1,28 @@
 import numpy as np
-from ..types import ChromaVec, DegreeVec, ScaleChromaVec
+from numpy.typing import ArrayLike
+
 from ..constants import DefaultMusicSystem as MS
-from . import validation as val
+from ..types import DT, ChromaKeyArray, InterpretedDegreeArray, ScaleLookupArray
+from . import chroma
 
 
-def chroma_to_degree(v: ChromaVec) -> DegreeVec:
-    deg = np.flatnonzero(v)
-    return val.validate_degree(deg)
+def chroma_to_interpreted(v: ArrayLike, lookup: ScaleLookupArray) -> InterpretedDegreeArray:
+    """
+    Interpret a chroma vector through a scale lookup (single-lookup fast path).
+    """
+    from .interval import _interpret_single_lookup
+
+    st = chroma.to_members(v)  # type: ignore
+    return _interpret_single_lookup(st, lookup)
 
 
-def degree_to_chroma(v: DegreeVec) -> ChromaVec:
-    chr = np.zeros(MS.tones)
-    chr[v] = 1
-    return val.validate_chroma(chr)
-
-
-def chroma_to_scale(v: ChromaVec) -> ScaleChromaVec:
-    return val.validate_scale_chroma(v)
+def interpreted_to_chroma(v: InterpretedDegreeArray) -> ChromaKeyArray:
+    """
+    Reconstruct a chroma vector from an InterpretedIntervalArray using
+    the semitone column.
+    """
+    st = v[..., 1].ravel()
+    valid = st >= 0
+    chroma_vec = np.zeros(MS.tones, dtype=DT.Bool)
+    chroma_vec[st[valid]] = True
+    return chroma.from_vector(chroma_vec)
